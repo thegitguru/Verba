@@ -13,13 +13,13 @@ p.name = "Bob".
 run p.walk.
 
 note Async
-async define background work as follows:
+async define background_work as follows:
     say "background job running".
     append "hello file!" to file called "bg.log".
     give "job done".
 end.
 
-task = async run background work.
+task = async run background_work.
 await result = task.
 say "Task finished with: ", result.
 
