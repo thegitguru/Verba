@@ -175,10 +175,10 @@ def parse_expr(tokens: list[str], *, line_no: int) -> object:
     if tokens_lc[0] == "new":
         if "with" in tokens_lc:
             with_i = tokens_lc.index("with")
-            class_name = _join_name(tokens[1:with_i])
+            class_name = _join_name(tokens[1:with_i], line_no=line_no)
             args = [parse_expr(a, line_no=line_no) for a in _split_by_commas(tokens[with_i + 1 :])]
             return ObjectNew(span, class_name, args)
-        class_name = _join_name(tokens[1:])
+        class_name = _join_name(tokens[1:], line_no=line_no)
         return ObjectNew(span, class_name, [])
 
     # "quote ..." -> literal string (rest of tokens joined with spaces)
@@ -186,10 +186,6 @@ def parse_expr(tokens: list[str], *, line_no: int) -> object:
         text = " ".join(tokens[1:]).strip()
         return Literal(span, text)
 
-    # Multi-word variable names (e.g. "user age") are allowed. If there are no math
-    # operator words present, treat the whole phrase as a single variable reference.
-    if len(tokens) > 1 and not any(t in ["plus", "minus", "times", "divided", "remainder", "+", "-", "*", "/"] for t in tokens_lc):
-        return VarRef(span, _join_name(tokens))
 
     # Shunting-yard to support precedence and multi-word operators.
     out: list[object] = []
@@ -435,7 +431,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
                 be_i = tokens_lc.index("=")
             except ValueError:
                 raise VerbaParseError("I expected 'be' or '=' in this let statement.", line_no=line_no, line=lt.raw)
-        name = _join_name(tokens[1:be_i])
+        name = _join_name(tokens[1:be_i], line_no=line_no)
         rest = tokens[be_i + 1 :]
         rest_lc = tokens_lc[be_i + 1 :]
 
@@ -486,7 +482,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
             to_i = tokens_lc.index("to")
         except ValueError:
             raise VerbaParseError("I expected 'to' in this set statement.", line_no=line_no, line=lt.raw)
-        name = _join_name(tokens[1:to_i])
+        name = _join_name(tokens[1:to_i], line_no=line_no)
         value = parse_expr(tokens[to_i + 1 :], line_no=line_no)
         cur.i += 1
         return SetVar(span, name, value)
@@ -521,7 +517,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         by_i = -1
     
     if by_i != -1 and not is_keyword_stmt:
-        name = _join_name(tokens[:by_i])
+        name = _join_name(tokens[:by_i], line_no=line_no)
         value = parse_expr(tokens[by_i + 1 :], line_no=line_no)
         cur.i += 1
         op = tokens_lc[by_i]
@@ -538,20 +534,20 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         
     if eq_i != -1 and eq_i + 1 < len(tokens_lc) and tokens_lc[eq_i+1] != "=" and not is_keyword_stmt:
         # We don't want to parse `x == 5` here.
-        name = _join_name(tokens[:eq_i])
+        name = _join_name(tokens[:eq_i], line_no=line_no)
         val_tc = tokens_lc[eq_i+1:]
         
         if val_tc and val_tc[0] == "await":
             cur.i += 1
-            return AwaitStmt(span, name, _join_name(tokens[eq_i+2:]))
+            return AwaitStmt(span, name, _join_name(tokens[eq_i+2:], line_no=line_no))
             
         if len(val_tc) >= 2 and val_tc[:2] == ["async", "run"]:
             with_i = val_tc.index("with") if "with" in val_tc else -1
             if with_i != -1:
-                fn = _join_name(tokens[eq_i+3 : eq_i+1+with_i])
+                fn = _join_name(tokens[eq_i+3 : eq_i+1+with_i], line_no=line_no)
                 args = [parse_expr(a, line_no=line_no) for a in _split_by_commas(tokens[eq_i+1+with_i+1:])]
             else:
-                fn = _join_name(tokens[eq_i+3:])
+                fn = _join_name(tokens[eq_i+3:], line_no=line_no)
                 args = []
             cur.i += 1
             return AsyncRun(span, name, fn, args)
@@ -559,10 +555,10 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         if len(val_tc) >= 4 and val_tc[:4] == ["the", "result", "of", "running"]:
             if "with" in val_tc:
                 with_i = val_tc.index("with")
-                fn = _join_name(tokens[eq_i + 5 : eq_i + 1 + with_i])
+                fn = _join_name(tokens[eq_i + 5 : eq_i + 1 + with_i], line_no=line_no)
                 args = [parse_expr(a, line_no=line_no) for a in _split_by_commas(tokens[eq_i + 1 + with_i + 1 :])]
             else:
-                fn = _join_name(tokens[eq_i + 5 :])
+                fn = _join_name(tokens[eq_i + 5 :], line_no=line_no)
                 args = []
             
             cur.i += 1
@@ -597,7 +593,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
             by_i = tokens_lc.index("by")
         except ValueError:
             raise VerbaParseError("I expected 'by' in this statement.", line_no=line_no, line=lt.raw)
-        name = _join_name(tokens[1:by_i])
+        name = _join_name(tokens[1:by_i], line_no=line_no)
         value = parse_expr(tokens[by_i + 1 :], line_no=line_no)
         cur.i += 1
         if tokens_lc[0] == "increase":
@@ -621,12 +617,12 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         _require_period(lt, line_no)
         # ask for <name>
         if tokens_lc[:2] == ["ask", "for"]:
-            name = _join_name(tokens[2:])
+            name = _join_name(tokens[2:], line_no=line_no)
             cur.i += 1
             return Ask(span, name)
         # ask the user for <name>
         if tokens_lc[:4] == ["ask", "the", "user", "for"]:
-            name = _join_name(tokens[4:])
+            name = _join_name(tokens[4:], line_no=line_no)
             cur.i += 1
             return Ask(span, name)
         # ask the user "prompt..." and save to <name>
@@ -657,7 +653,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
                 elif prompt.startswith("'") and prompt.endswith("'"):
                     prompt = prompt[1:-1]
                 
-                name = _join_name(tokens[to_i + 1 :])
+                name = _join_name(tokens[to_i + 1 :], line_no=line_no)
                 cur.i += 1
                 return Ask(span, name, prompt=prompt)
 
@@ -691,7 +687,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
             raise VerbaParseError("A load line must say 'into <variable>'.", line_no=line_no, line=lt.raw)
         into_i = tokens_lc.index("into", 3)
         filename_expr = parse_expr(tokens[3:into_i], line_no=line_no)
-        target_name = _join_name(tokens[into_i + 1 :])
+        target_name = _join_name(tokens[into_i + 1 :], line_no=line_no)
         cur.i += 1
         return LoadFile(span, filename_expr, target_name)
         
@@ -713,14 +709,14 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         _require_period(lt, line_no)
         into_i = tokens_lc.index("into")
         url = parse_expr(tokens[1:into_i], line_no=line_no)
-        target = _join_name(tokens[into_i + 1 :])
+        target = _join_name(tokens[into_i + 1 :], line_no=line_no)
         cur.i += 1
         return FetchUrl(span, url, target)
         
     if tokens_lc[0] in ["free", "delete"]:
         _require_period(lt, line_no)
         cur.i += 1
-        return FreeVar(span, _join_name(tokens[1:]))
+        return FreeVar(span, _join_name(tokens[1:], line_no=line_no))
 
     if tokens_lc[0] == "import":
         _require_period(lt, line_no)
@@ -739,7 +735,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         except ValueError:
             raise VerbaParseError("I expected 'to' in this add statement.", line_no=line_no, line=lt.raw)
         value = parse_expr(tokens[1:to_i], line_no=line_no)
-        list_name = _join_name(tokens[to_i + 1 :])
+        list_name = _join_name(tokens[to_i + 1 :], line_no=line_no)
         cur.i += 1
         return ListAdd(span, value, list_name)
 
@@ -750,7 +746,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         except ValueError:
             raise VerbaParseError("I expected 'from' in this remove statement.", line_no=line_no, line=lt.raw)
         value = parse_expr(tokens[1:from_i], line_no=line_no)
-        list_name = _join_name(tokens[from_i + 1 :])
+        list_name = _join_name(tokens[from_i + 1 :], line_no=line_no)
         cur.i += 1
         return ListRemove(span, value, list_name)
 
@@ -882,11 +878,11 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         if not (len(tokens_lc) >= 4 and tokens_lc[-3:] == ["do", "the", "following"]):
             raise VerbaParseError("A for each line must end with 'do the following.'", line_no=line_no, line=lt.raw)
         in_i = tokens_lc.index("in")
-        item_name = _join_name(tokens[2:in_i])
+        item_name = _join_name(tokens[2:in_i], line_no=line_no)
         list_tokens = tokens[in_i + 1 : -3]
         if list_tokens and list_tokens[-1] == ",":
             list_tokens = list_tokens[:-1]
-        list_name = _join_name(list_tokens)
+        list_name = _join_name(list_tokens, line_no=line_no)
         cur.i += 1
         body = _parse_block(cur, expected_indent=expected_indent + 4)
         if cur.i >= len(cur.lines):
@@ -905,9 +901,9 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         if tokens_lc[-1] != ":":
             raise VerbaParseError("A for line must end with ':'", line_no=line_no, line=lt.raw)
         in_i = tokens_lc.index("in")
-        item_name = _join_name(tokens[1:in_i])
+        item_name = _join_name(tokens[1:in_i], line_no=line_no)
         list_tokens = tokens[in_i + 1 : -1]
-        list_name = _join_name(list_tokens)
+        list_name = _join_name(list_tokens, line_no=line_no)
         cur.i += 1
         body = _parse_block(cur, expected_indent=expected_indent + 4)
         if cur.i >= len(cur.lines):
@@ -922,7 +918,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
 
     if tokens_lc[0] == "class":
         _require_period(lt, line_no)
-        name = _join_name(tokens[1:-1]) if tokens_lc[-1] == ":" else _join_name(tokens[1:])
+        name = _join_name(tokens[1:-1], line_no=line_no) if tokens_lc[-1] == ":" else _join_name(tokens[1:], line_no=line_no)
         cur.i += 1
         body = _parse_block(cur, expected_indent=expected_indent + 4)
         methods = {}
@@ -968,10 +964,10 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         
         if "needing" in sig_lc:
             needing_i = sig_lc.index("needing")
-            name = _join_name(signature[:needing_i])
-            params = [_join_name(p) for p in _split_by_commas(signature[needing_i + 1 :]) if p]
+            name = _join_name(signature[:needing_i], line_no=line_no)
+            params = [_join_name(p, line_no=line_no) for p in _split_by_commas(signature[needing_i + 1 :]) if p]
         else:
-            name = _join_name(signature)
+            name = _join_name(signature, line_no=line_no)
             params = []
             
         cur.i += 1
@@ -1000,10 +996,10 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         _require_period(lt, line_no)
         if "with" in tokens_lc:
             with_i = tokens_lc.index("with")
-            fn = _join_name(tokens[1:with_i])
+            fn = _join_name(tokens[1:with_i], line_no=line_no)
             args = [parse_expr(a, line_no=line_no) for a in _split_by_commas(tokens[with_i + 1 :])]
         else:
-            fn = _join_name(tokens[1:])
+            fn = _join_name(tokens[1:], line_no=line_no)
             args = []
             
         cur.i += 1
@@ -1049,7 +1045,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
                                 do_i = len(clean_nxt_lc) - 1
                             else:
                                 do_i = len(clean_nxt_lc) - 3
-                            error_name = _join_name(clean_nxt_tokens[to_i + 1 : do_i])
+                            error_name = _join_name(clean_nxt_tokens[to_i + 1 : do_i], line_no=nxt_no)
                     cur.i += 1
                     catch_body = _parse_block(cur, expected_indent=expected_indent + 4)
                 else:
