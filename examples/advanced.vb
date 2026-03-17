@@ -29,7 +29,7 @@ delete file called "bg.log".
 
 note Fetch url
 fetch "http://google.com" into data.
-say "Fetched example.com successfully.".
+say "Fetched google.com successfully.".
 
 note Free memory
 free data.
