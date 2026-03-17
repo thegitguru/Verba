@@ -116,7 +116,8 @@ class Interpreter:
             for v in s.values:
                 val = self._eval_expr(v, env=env, context="say")
                 outs.append(self._format_value(val))
-            print(" ".join(outs))
+            separator = " " if s.newline else ""
+            print(separator.join(outs), end="\n" if s.newline else "")
             return
 
         if isinstance(s, ast.Ask):

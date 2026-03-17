@@ -108,6 +108,7 @@ class Decrease(Stmt):
 class Say(Stmt):
     span: Span
     values: list[Expr]
+    newline: bool = True
 
 
 @dataclass(frozen=True)

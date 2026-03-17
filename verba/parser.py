@@ -454,7 +454,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         parts = _split_by_word(tokens[1:], word="and")
         values = [_parse_say_value(p, line_no=line_no) for p in parts if p]
         cur.i += 1
-        return Say(span, values)
+        return Say(span, values, newline=tokens_lc[0] == "say")
 
     # ask
     if tokens_lc[0] == "ask":
