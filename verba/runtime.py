@@ -130,8 +130,7 @@ class Interpreter:
             for v in s.values:
                 val = self._eval_expr(v, env=env, context="say")
                 outs.append(self._format_value(val))
-            separator = " " if s.newline else ""
-            print(separator.join(outs), end="\n" if s.newline else "")
+            print("".join(outs), end="\n" if s.newline else "")
             return
 
         if isinstance(s, ast.Ask):
@@ -511,7 +510,11 @@ class Interpreter:
         if method_name not in obj.cls.methods:
              raise VerbaRuntimeError(f"Object has no method called {method_name}.", line_no=line_no)
         fn = obj.cls.methods[method_name]
-        
+        if len(args) != len(fn.params):
+            raise VerbaRuntimeError(
+                f"The method called {method_name} needs {len(fn.params)} value(s), but you gave {len(args)}.",
+                line_no=line_no,
+            )
         call_env = Environment(parent=self.globals)
         call_env.set("self", obj)
         for p, a in zip(fn.params, args):

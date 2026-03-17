@@ -996,9 +996,6 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         value = parse_expr(tokens[value_start:], line_no=line_no)
         cur.i += 1
         return GiveBack(span, value)
-        value = parse_expr(tokens[value_start:], line_no=line_no)
-        cur.i += 1
-        return GiveBack(span, value)
 
     # run function ...
     if first_val == "run":
