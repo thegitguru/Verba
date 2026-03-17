@@ -225,3 +225,86 @@ class TryBlock(Stmt):
 class Import(Stmt):
     span: Span
     filename: Expr
+
+@dataclass(frozen=True)
+class AppendToFile(Stmt):
+    span: Span
+    text: Expr
+    filename: Expr
+
+@dataclass(frozen=True)
+class DeleteFile(Stmt):
+    span: Span
+    filename: Expr
+
+@dataclass(frozen=True)
+class FetchUrl(Stmt):
+    span: Span
+    url: Expr
+    target_name: str
+
+@dataclass(frozen=True)
+class FreeVar(Stmt):
+    span: Span
+    name: str
+
+@dataclass(frozen=True)
+class ClassDef(Stmt):
+    span: Span
+    name: str
+    methods: dict[str, Define]
+
+@dataclass(frozen=True)
+class ObjectNew(Expr):
+    span: Span
+    class_name: str
+    args: list[Expr]
+
+@dataclass(frozen=True)
+class ObjectPropGet(Expr):
+    span: Span
+    obj_name: str
+    prop: str
+
+@dataclass(frozen=True)
+class ObjectPropSet(Stmt):
+    span: Span
+    obj_name: str
+    prop: str
+    value: Expr
+
+@dataclass(frozen=True)
+class MethodCall(Stmt):
+    span: Span
+    obj_name: str
+    method: str
+    args: list[Expr]
+
+@dataclass(frozen=True)
+class LetResultOfMethod(Stmt):
+    span: Span
+    target_name: str
+    obj_name: str
+    method: str
+    args: list[Expr]
+
+@dataclass(frozen=True)
+class AsyncDefine(Stmt):
+    span: Span
+    name: str
+    params: list[str]
+    body: list[Stmt]
+
+@dataclass(frozen=True)
+class AsyncRun(Stmt):
+    span: Span
+    target_name: str
+    func_name: str
+    args: list[Expr]
+
+@dataclass(frozen=True)
+class AwaitStmt(Stmt):
+    span: Span
+    target_name: str
+    task_name: str
+

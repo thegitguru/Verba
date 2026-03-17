@@ -14,6 +14,17 @@ class Function:
     body: list[ast.Stmt]
 
 
+@dataclass
+class ClassObj:
+    name: str
+    methods: dict[str, ast.Define]
+
+
+class Instance:
+    def __init__(self, cls: ClassObj):
+        self.cls = cls
+        self.props = {}
+
 class _ReturnSignal(Exception):
     def __init__(self, value: Any):
         self.value = value
@@ -56,6 +67,7 @@ class Interpreter:
     def __init__(self):
         self.globals = Environment()
         self.functions: dict[str, Function] = {}
+        self.classes: dict[str, ClassObj] = {}
 
     def run(self, program: list[ast.Stmt]) -> Any:
         return self._exec_block(program, env=self.globals)
@@ -273,10 +285,139 @@ class Interpreter:
                 raise VerbaRuntimeError(f"Error parsing imported file {filename}: {e}", line_no=ln)
             return
 
+        if isinstance(s, ast.AppendToFile):
+            text = self._eval_expr(s.text, env=env, context="general")
+            filename = self._eval_expr(s.filename, env=env, context="general")
+            try:
+                with open(str(filename), "a", encoding="utf-8") as f:
+                    f.write(self._to_word(text))
+            except OSError:
+                raise VerbaRuntimeError(f"I could not save to the file called {filename}.", line_no=ln)
+            return
+
+        if isinstance(s, ast.DeleteFile):
+            filename = self._eval_expr(s.filename, env=env, context="general")
+            import os
+            try:
+                os.remove(str(filename))
+            except OSError:
+                pass
+            return
+
+        if isinstance(s, ast.FetchUrl):
+            import urllib.request
+            url = self._eval_expr(s.url, env=env, context="general")
+            try:
+                with urllib.request.urlopen(str(url)) as response:
+                    html = response.read().decode()
+                env.set(s.target_name, html)
+            except Exception:
+                raise VerbaRuntimeError(f"I could not fetch the URL: {url}.", line_no=ln)
+            return
+
+        if isinstance(s, ast.FreeVar):
+            if env.contains(s.name):
+                curr = env
+                while curr is not None:
+                    if s.name in curr.values:
+                        del curr.values[s.name]
+                        return
+                    curr = curr.parent
+            return
+
+        if isinstance(s, ast.ClassDef):
+            self.classes[s.name] = ClassObj(s.name, s.methods)
+            return
+
+        if isinstance(s, ast.ObjectPropSet):
+            obj = env.get(s.obj_name)
+            if not isinstance(obj, Instance):
+                raise VerbaRuntimeError(f"Variable {s.obj_name} is not an object.", line_no=ln)
+            val = self._eval_expr(s.value, env=env, context="general")
+            obj.props[s.prop] = val
+            return
+
+        if isinstance(s, ast.MethodCall):
+            obj = env.get(s.obj_name)
+            if not isinstance(obj, Instance):
+                raise VerbaRuntimeError(f"Variable {s.obj_name} is not an object.", line_no=ln)
+            self._call_method(obj, s.method, s.args, caller_env=env, line_no=ln)
+            return
+
+        if isinstance(s, ast.LetResultOfMethod):
+            obj = env.get(s.obj_name)
+            if not isinstance(obj, Instance):
+                raise VerbaRuntimeError(f"Variable {s.obj_name} is not an object.", line_no=ln)
+            val = self._call_method(obj, s.method, s.args, caller_env=env, line_no=ln)
+            env.set(s.target_name, val)
+            return
+
+        if isinstance(s, ast.AsyncDefine):
+            self.functions[s.name] = s
+            return
+
+        if isinstance(s, ast.AsyncRun):
+            import threading
+            task_env = Environment(parent=self.globals)
+            for p, a in zip(self.functions[s.func_name].params, s.args):
+                task_env.set(p, self._eval_expr(a, env=env, context="general"))
+                
+            task = {"result": None, "done": False, "error": None}
+            def _async_worker():
+                try:
+                    res = None
+                    try:
+                        self._exec_block(self.functions[s.func_name].body, env=task_env)
+                    except _ReturnSignal as r:
+                         res = r.value
+                    task["result"] = res
+                except Exception as e:
+                    task["error"] = e
+                finally:
+                    task["done"] = True
+                    
+            env.set(s.target_name, task)
+            threading.Thread(target=_async_worker).start()
+            return
+            
+        if isinstance(s, ast.AwaitStmt):
+            import time
+            task = env.get(s.task_name)
+            if not isinstance(task, dict) or "done" not in task:
+                raise VerbaRuntimeError(f"Variable {s.task_name} is not a valid async task.", line_no=ln)
+            while not task["done"]:
+                time.sleep(0.01)
+            if task["error"]:
+                raise VerbaRuntimeError(f"Async error: {task['error']}", line_no=ln)
+            env.set(s.target_name, task["result"])
+            return
+
         raise VerbaRuntimeError("I reached a statement I cannot execute yet.", line_no=ln)
 
     def _eval_expr(self, e: ast.Expr, *, env: Environment, context: str) -> Any:
         ln = e.span.line_no
+
+        if isinstance(e, ast.ObjectNew):
+            if e.class_name not in self.classes:
+                raise VerbaRuntimeError(f"Class {e.class_name} has not been defined.", line_no=ln)
+            cls = self.classes[e.class_name]
+            inst = Instance(cls)
+            if "init" in cls.methods:
+                self._call_method(inst, "init", e.args, caller_env=env, line_no=ln)
+            elif e.args:
+                raise VerbaRuntimeError(f"Class {e.class_name} does not have an init method but arguments were passed.", line_no=ln)
+            return inst
+
+        if isinstance(e, ast.ObjectPropGet):
+            if e.obj_name == "self":
+                obj = env.get("self")
+            else:
+                obj = env.get(e.obj_name)
+            if not isinstance(obj, Instance):
+                raise VerbaRuntimeError(f"Variable {e.obj_name} is not an object.", line_no=ln)
+            if e.prop in obj.props:
+                return obj.props[e.prop]
+            return None
 
         if isinstance(e, ast.Literal):
             return e.value
@@ -354,6 +495,22 @@ class Interpreter:
         call_env = Environment(parent=self.globals)
         for p, a in zip(fn.params, args, strict=True):
             call_env.set(p, self._eval_expr(a, env=caller_env, context="general"))
+        try:
+            self._exec_block(fn.body, env=call_env)
+        except _ReturnSignal as r:
+            return r.value
+        return None
+
+    def _call_method(self, obj: Instance, method_name: str, args: list[ast.Expr], *, caller_env: Environment, line_no: int) -> Any:
+        if method_name not in obj.cls.methods:
+             raise VerbaRuntimeError(f"Object has no method called {method_name}.", line_no=line_no)
+        fn = obj.cls.methods[method_name]
+        
+        call_env = Environment(parent=self.globals)
+        call_env.set("self", obj)
+        for p, a in zip(fn.params, args):
+            call_env.set(p, self._eval_expr(a, env=caller_env, context="general"))
+            
         try:
             self._exec_block(fn.body, env=call_env)
         except _ReturnSignal as r:

@@ -36,6 +36,19 @@ from .ast import (
     While,
     TryBlock,
     Import,
+    AppendToFile,
+    DeleteFile,
+    FetchUrl,
+    FreeVar,
+    ClassDef,
+    ObjectNew,
+    ObjectPropGet,
+    ObjectPropSet,
+    MethodCall,
+    LetResultOfMethod,
+    AsyncDefine,
+    AsyncRun,
+    AwaitStmt,
 )
 from .errors import VerbaParseError
 from .tokenize import LineTokens, tokenize_program
@@ -127,6 +140,11 @@ def _parse_atom(tokens: list[str], tokens_lc: list[str], i: int, *, span: Span) 
 
     if (tok.startswith('"') and tok.endswith('"')) or (tok.startswith("'") and tok.endswith("'")):
         return Literal(span, tok[1:-1]), i + 1
+        
+    if "." in tok and tok.count(".") == 1:
+        idx = tok.index(".")
+        if idx > 0 and idx < len(tok) - 1:
+            return ObjectPropGet(span, tok[:idx].lower(), tok[idx+1:].lower()), i + 1
 
     # Word literals are bare single tokens (e.g. hello, Alice). Multi-word text uses "quote".
     return VarRef(span, _join_name([tok])), i + 1
@@ -148,6 +166,15 @@ def parse_expr(tokens: list[str], *, line_no: int) -> object:
         raise VerbaParseError("I expected a value here.", line_no=line_no)
     span = Span(line_no)
     tokens_lc = _lc(tokens)
+
+    if tokens_lc[0] == "new":
+        if "with" in tokens_lc:
+            with_i = tokens_lc.index("with")
+            class_name = _join_name(tokens[1:with_i])
+            args = [parse_expr(a, line_no=line_no) for a in _split_by_commas(tokens[with_i + 1 :])]
+            return ObjectNew(span, class_name, args)
+        class_name = _join_name(tokens[1:])
+        return ObjectNew(span, class_name, [])
 
     # "quote ..." -> literal string (rest of tokens joined with spaces)
     if tokens_lc[0] == "quote":
@@ -385,8 +412,15 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
                     return LetResultOfRun(span, target, fn, exprs)
                 else:
                     fn = _join_name(tokens[j:])
+                    args_exprs = []
+                
+                if "." in fn:
+                    parts = fn.split(".")
                     cur.i += 1
-                    return LetResultOfRun(span, target, fn, [])
+                    return LetResultOfMethod(span, target, parts[0], parts[1], args_exprs)
+                else:
+                    cur.i += 1
+                    return LetResultOfRun(span, target, fn, args_exprs)
 
         # General let: let <name...> be [the number|the word|the flag] <value...>.
         try:
@@ -479,8 +513,30 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
     if eq_i != -1 and eq_i + 1 < len(tokens_lc) and tokens_lc[eq_i+1] != "=":
         # We don't want to parse `x == 5` here.
         name = _join_name(tokens[:eq_i])
+        val_tc = tokens_lc[eq_i+1:]
+        
+        if val_tc and val_tc[0] == "await":
+            cur.i += 1
+            return AwaitStmt(span, name, _join_name(tokens[eq_i+2:]))
+            
+        if len(val_tc) >= 2 and val_tc[:2] == ["async", "run"]:
+            with_i = val_tc.index("with") if "with" in val_tc else -1
+            if with_i != -1:
+                fn = _join_name(tokens[eq_i+3 : eq_i+1+with_i])
+                args = [parse_expr(a, line_no=line_no) for a in _split_by_commas(tokens[eq_i+1+with_i+1:])]
+            else:
+                fn = _join_name(tokens[eq_i+3:])
+                args = []
+            cur.i += 1
+            return AsyncRun(span, name, fn, args)
+            
         value = parse_expr(tokens[eq_i + 1 :], line_no=line_no)
         cur.i += 1
+        
+        if "." in name:
+            parts = name.split(".")
+            return ObjectPropSet(span, parts[0], parts[1], value)
+            
         return Let(span, name, value)
 
     # increase/decrease
@@ -588,6 +644,33 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         cur.i += 1
         return LoadFile(span, filename_expr, target_name)
         
+    if tokens_lc[0] == "append":
+        _require_period(lt, line_no)
+        to_i = tokens_lc.index("to")
+        text_expr = parse_expr(tokens[1:to_i], line_no=line_no)
+        filename_expr = parse_expr(tokens[to_i + 3 :], line_no=line_no)
+        cur.i += 1
+        return AppendToFile(span, text_expr, filename_expr)
+        
+    if tokens_lc[:2] == ["delete", "file"]:
+        _require_period(lt, line_no)
+        filename_expr = parse_expr(tokens[3:], line_no=line_no)
+        cur.i += 1
+        return DeleteFile(span, filename_expr)
+
+    if tokens_lc[0] == "fetch":
+        _require_period(lt, line_no)
+        into_i = tokens_lc.index("into")
+        url = parse_expr(tokens[1:into_i], line_no=line_no)
+        target = _join_name(tokens[into_i + 1 :])
+        cur.i += 1
+        return FetchUrl(span, url, target)
+        
+    if tokens_lc[0] in ["free", "delete"]:
+        _require_period(lt, line_no)
+        cur.i += 1
+        return FreeVar(span, _join_name(tokens[1:]))
+
     if tokens_lc[0] == "import":
         _require_period(lt, line_no)
         # import from file called [filename].
@@ -786,23 +869,60 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         cur.i += 1
         return ForEach(span, item_name, list_name, body)
 
-    # define function ...
-    if tokens_lc[0] == "define":
+    if tokens_lc[0] == "class":
         _require_period(lt, line_no)
-        if tokens_lc[-2:] != ["as", "follows"]:
-            raise VerbaParseError(
-                "A define line must end with 'as follows.'",
-                line_no=line_no,
-                line=lt.raw,
-            )
-        if "needing" in tokens_lc:
-            needing_i = tokens_lc.index("needing")
-            name = _join_name(tokens[1:needing_i])
-            params_tokens = tokens[needing_i + 1 : -2]
-            params = [_join_name(p) for p in _split_by_commas(params_tokens) if p]
+        name = _join_name(tokens[1:-1]) if tokens_lc[-1] == ":" else _join_name(tokens[1:])
+        cur.i += 1
+        body = _parse_block(cur, expected_indent=expected_indent + 4)
+        methods = {}
+        for s in body:
+            if isinstance(s, Define) or isinstance(s, AsyncDefine):
+                methods[s.name] = s
+            elif isinstance(s, Note):
+                pass
+            else:
+                raise VerbaParseError("Only 'define' methods and notes are allowed at the root of a 'class'.", line_no=line_no)
+        
+        if cur.i >= len(cur.lines):
+            raise VerbaParseError("I expected 'end.'", line_no=line_no)
+        end_line = cur.lines[cur.i]
+        end_no = cur.i + 1
+        if end_line.indent != expected_indent or _lc(end_line.tokens)[0] != "end":
+            raise VerbaParseError("I expected 'end.'", line_no=end_no, line=end_line.raw)
+        _require_period(end_line, end_no)
+        cur.i += 1
+        return ClassDef(span, name, methods)
+
+    # define function ...
+    if tokens_lc[0] in ["define", "async"] and (tokens_lc[0] == "define" or (len(tokens_lc) > 1 and tokens_lc[1] == "define")):
+        _require_period(lt, line_no)
+        
+        is_async = tokens_lc[0] == "async"
+        offset = 1 if not is_async else 2
+        
+        # Trim `:` or `as follows` from the end to leave only the signature
+        signature = tokens[offset:]
+        sig_lc = tokens_lc[offset:]
+        if sig_lc and sig_lc[-1] == ":":
+            signature = signature[:-1]
+            sig_lc = sig_lc[:-1]
+            if len(sig_lc) >= 2 and sig_lc[-2:] == ["as", "follows"]:
+                signature = signature[:-2]
+                sig_lc = sig_lc[:-2]
+        elif len(sig_lc) >= 2 and sig_lc[-2:] == ["as", "follows"]:
+            signature = signature[:-2]
+            sig_lc = sig_lc[:-2]
         else:
-            name = _join_name(tokens[1:-2])
+             raise VerbaParseError("A define line must end with 'as follows.' or ':'", line_no=line_no, line=lt.raw)
+        
+        if "needing" in sig_lc:
+            needing_i = sig_lc.index("needing")
+            name = _join_name(signature[:needing_i])
+            params = [_join_name(p) for p in _split_by_commas(signature[needing_i + 1 :]) if p]
+        else:
+            name = _join_name(signature)
             params = []
+            
         cur.i += 1
         body = _parse_block(cur, expected_indent=expected_indent + 4)
         # expect end define.
@@ -831,11 +951,16 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
             with_i = tokens_lc.index("with")
             fn = _join_name(tokens[1:with_i])
             args = [parse_expr(a, line_no=line_no) for a in _split_by_commas(tokens[with_i + 1 :])]
-            cur.i += 1
-            return Run(span, fn, args)
-        fn = _join_name(tokens[1:])
+        else:
+            fn = _join_name(tokens[1:])
+            args = []
+            
         cur.i += 1
-        return Run(span, fn, [])
+        
+        if "." in fn:
+            parts = fn.split(".")
+            return MethodCall(span, parts[0], parts[1], args)
+        return Run(span, fn, args)
 
     # let x be item N of list.
     if tokens_lc[0] == "let" and "item" in tokens_lc and "of" in tokens_lc:
