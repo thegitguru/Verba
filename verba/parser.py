@@ -70,10 +70,15 @@ def _require_period(line: LineTokens, line_no: int) -> None:
 def _join_name(words: list[str], *, line_no: int = 0) -> str:
     # Variable/function names must be a single word (no spaces allowed).
     if len(words) > 1:
-        raise VerbaParseError(
-            f"I found a multi-word name: '{' '.join(words)}'. Names must be a single word without spaces.",
-            line_no=line_no
-        )
+        # Filter out empty strings which might come from list splits
+        filtered = [w for w in words if w.strip()]
+        if len(filtered) > 1:
+            raise VerbaParseError(
+                f"I found a multi-word name: '{' '.join(filtered)}'. Names must be a single word without spaces.",
+                line_no=line_no
+            )
+        if not filtered: return ""
+        return filtered[0].lower().strip()
     return words[0].lower().strip() if words else ""
 
 
