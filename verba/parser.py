@@ -13,6 +13,7 @@ from .ast import (
     Compare,
     Define,
     Decrease,
+    Expr,
     ForEach,
     GiveBack,
     If,
