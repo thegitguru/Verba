@@ -129,24 +129,15 @@ def browser_url() -> str:
 
 
 def browser_screenshot(path: str) -> str:
-    raise RuntimeError(
-        "browser.screenshot requires Playwright. "
-        "Install it with: pip install playwright && python -m playwright install chromium"
-    )
+    raise RuntimeError("browser.screenshot is not supported in this version.")
 
 
 def browser_click(selector: str) -> str:
-    raise RuntimeError(
-        "browser.click requires Playwright (a real browser). "
-        "Install it with: pip install playwright && python -m playwright install chromium"
-    )
+    raise RuntimeError("browser.click is not supported (requires a headless browser).")
 
 
 def browser_type(selector: str, text: str) -> str:
-    raise RuntimeError(
-        "browser.type requires Playwright (a real browser). "
-        "Install it with: pip install playwright && python -m playwright install chromium"
-    )
+    raise RuntimeError("browser.type is not supported (requires a headless browser).")
 
 
 def browser_wait(ms: str) -> str:
@@ -164,10 +155,7 @@ def browser_wait_for(selector: str) -> str:
 
 
 def browser_eval(js: str) -> str:
-    raise RuntimeError(
-        "browser.eval requires Playwright (a real browser). "
-        "Install it with: pip install playwright && python -m playwright install chromium"
-    )
+    raise RuntimeError("browser.eval is not supported.")
 
 
 def browser_close() -> str:

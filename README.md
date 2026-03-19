@@ -11,11 +11,17 @@ Verba is a modern interpreter with clean, readable structural syntax.
 
 ---
 
-## Install
+## Installation
+
+**Requirements:** Python 3.10 or higher.
+
+To install Verba and its command-line tool, run:
 
 ```bash
 python -m pip install -e .
 ```
+
+This will add the `verba` command to your system path.
 
 ## Run a Program
 
@@ -645,8 +651,6 @@ run browser.close.
 | `browser.title` | Get the current page title |
 | `browser.url` | Get the current page URL |
 | `browser.close` | Clear the loaded page |
-
-> `browser.click`, `browser.type`, `browser.screenshot`, and `browser.eval` require Playwright (`pip install playwright && python -m playwright install chromium`) and will raise an error if called without it.
 
 ---
 
