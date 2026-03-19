@@ -13,15 +13,9 @@ Verba is a modern interpreter with clean, readable structural syntax.
 
 ## Installation
 
-**Requirements:** Python 3.10 or higher.
+**Requirement:** All you need is the `verba.exe` binary.
 
-To install Verba and its command-line tool, run:
-
-```bash
-python -m pip install -e .
-```
-
-This will add the `verba` command to your system path.
+To use Verba, ensure that the folder containing `verba.exe` is in your system path. This allows you to run Verba scripts from any directory.
 
 ## Run a Program
 
