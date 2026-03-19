@@ -65,9 +65,90 @@ def repl() -> int:
     return 0
 
 
+def install_pkg(url: str) -> int:
+    import urllib.request
+    from urllib.parse import urlparse
+    
+    # name from URL: if no .vrb, append it.
+    parsed = urlparse(url)
+    name = Path(parsed.path).name
+    if not name:
+        print(f"Error: Could not determine package name for URL: {url}")
+        return 1
+    if not name.endswith(".vrb"):
+        name += ".vrb"
+        
+    print(f"Installing {name} from {url}...")
+    try:
+        with urllib.request.urlopen(url) as response:
+            content = response.read()
+        
+        modules_dir = Path("modules")
+        modules_dir.mkdir(exist_ok=True)
+        (modules_dir / name).write_bytes(content)
+        print(f"Successfully installed package to {modules_dir / name}")
+        return 0
+    except Exception as e:
+        print(f"I failed to install the package: {e}")
+        return 1
+
+
+def format_file(path: Path) -> int:
+    try:
+        source = path.read_text(encoding="utf-8")
+        lines = source.splitlines()
+        indent = 0
+        new_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                new_lines.append("")
+                continue
+            
+            ls = stripped.lower()
+            # words that decrease indent for the current line
+            if ls.startswith("end.") or ls.startswith("else:") or ls.startswith("otherwise:") or ls.startswith("on error") or ls.startswith("finally:"):
+                indent = max(0, indent - 4)
+            
+            new_lines.append(" " * indent + stripped)
+            
+            # words that increase indent for the NEXT lines
+            if stripped.endswith(":") or ls.endswith("as follows:"):
+                indent += 4
+        
+        path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+        print(f"Formatted {path}")
+        return 0
+    except Exception as e:
+        print(f"I failed to format the file: {e}")
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="verba", description="Run Verba (natural English) programs.")
-    p.add_argument("file", nargs="?", help="Path to a .vrb (Verba) file.")
+    sub = p.add_subparsers(dest="command")
+    
+    # run (default)
+    run_p = sub.add_parser("run", help="Run a Verba script.")
+    run_p.add_argument("file", help="The .vrb file to run.")
+    
+    # check
+    check_p = sub.add_parser("check", help="Parse script without running.")
+    check_p.add_argument("file")
+    
+    # repl
+    sub.add_parser("repl", help="Start interactive shell.")
+    
+    # install
+    inst_p = sub.add_parser("install", help="Install a package from a URL.")
+    inst_p.add_argument("url", help="URL of the .vrb file.")
+
+    # format
+    fmt_p = sub.add_parser("format", help="Format a Verba script.")
+    fmt_p.add_argument("file")
+
+    # original/legacy args (for backward compatibility if possible)
+    p.add_argument("legacy_file", nargs="?", help="Legacy file argument.")
     p.add_argument("--repl",    action="store_true", help="Start an interactive REPL.")
     p.add_argument("--version", action="store_true", help="Print version and exit.")
     p.add_argument("--check",   action="store_true", help="Parse only — do not run.")
@@ -79,12 +160,30 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
-        if ns.repl or ns.file is None:
+        # Check subcommands
+        if ns.command == "install":
+            return install_pkg(ns.url)
+        if ns.command == "format":
+            return format_file(Path(ns.file))
+        if ns.command == "check":
+            return check_file(Path(ns.file))
+        if ns.command == "repl":
+            return repl()
+        if ns.command == "run":
+            return run_file(Path(ns.file))
+            
+        # legacy handling
+        if ns.repl or (ns.command is None and ns.legacy_file is None):
             return repl()
         if ns.check:
-            return check_file(Path(ns.file))
-        return run_file(Path(ns.file))
+             return check_file(Path(ns.legacy_file))
+        if ns.legacy_file:
+             return run_file(Path(ns.legacy_file))
+        
+        return repl()
     except (VerbaParseError, VerbaRuntimeError) as e:
+        import traceback
+        traceback.print_exc()
         print(e, file=sys.stderr)
         return 1
     except VerbaError as e:

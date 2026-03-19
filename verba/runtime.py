@@ -7,160 +7,15 @@ from . import ast
 from .errors import VerbaRuntimeError
 
 
-class Pointer:
-    """A mutable cell. ref x wraps the variable name + its environment."""
-    def __init__(self, name: str, env: "Environment"):
-        self.name = name
-        self.env = env
-
-    def get(self) -> object:
-        return self.env.get(self.name)
-
-    def set(self, value: object) -> None:
-        self.env.set(self.name, value)
-
-    def __repr__(self) -> str:
-        return f"<ptr -> {self.name}>"
-
-
-@dataclass
-class Function:
-    name: str
-    params: list[str]
-    body: list[ast.Stmt]
-    defaults: dict = None
-
-    def __post_init__(self):
-        if self.defaults is None:
-            self.defaults = {}
-
-
-@dataclass
-class ClassObj:
-    name: str
-    methods: dict[str, ast.Define]
-    parent: Optional["ClassObj"] = None
-    field_defaults: dict = None  # {field_name: evaluated_default_value}
-
-    def __post_init__(self):
-        if self.field_defaults is None:
-            self.field_defaults = {}
-
-
-class Instance:
-    def __init__(self, cls: ClassObj):
-        self.cls = cls
-        self.props = {}
-
-
-@dataclass
-class NativeFunction:
-    """A Python callable exposed as a Verba function."""
-    name: str
-    params: list[str]
-    fn: object          # callable
-    needs_interp: bool = False
-
-
-class NativeInstance:
-    """
-    An object whose methods are NativeFunctions.
-    Exposed in Verba as a variable (e.g. `http`, `browser`, `express`).
-    """
-    def __init__(self, name: str, methods: dict[str, NativeFunction]):
-        self.name    = name
-        self.methods = methods
-        self.cls     = None
-        self.props: dict[str, Any] = {}
-
-
-class _ReturnSignal(Exception):
-    def __init__(self, value: Any):
-        self.value = value
-
-
-class _BreakSignal(Exception):
-    pass
-
-
-class _ContinueSignal(Exception):
-    pass
-
-
-class _RespondSignal(Exception):
-    """Raised by ServeRespond to unwind back to the HTTP handler."""
-    def __init__(self, body: str, status: int, mime: str):
-        self.body   = body
-        self.status = status
-        self.mime   = mime
-
-
-class _RedirectSignal(Exception):
-    """Raised by ServeRedirect to issue an HTTP redirect."""
-    def __init__(self, url: str, status: int):
-        self.url    = url
-        self.status = status
-
-
-class _VerbaRequest:
-    """Injected as `request` inside every route handler block."""
-    def __init__(self, method: str, path: str, query: dict, form: dict,
-                 raw_body: str, headers: dict):
-        self._query = query
-        self._form  = form
-        self._headers = headers
-        # Expose as Instance-compatible so request.method etc. work via ObjectPropGet
-        self.cls   = None
-        self.props = {
-            "method": method,
-            "path":   path,
-            "body":   raw_body,
-        }
-        # Also pre-populate query and form keys directly
-        for k, v in query.items():
-            self.props[f"query_{k}"] = v[0] if v else ""
-        for k, v in form.items():
-            self.props[f"form_{k}"] = v[0] if v else ""
-
-
-class Environment:
-    def __init__(self, parent: Optional["Environment"] = None):
-        self.parent = parent
-        self.values: dict[str, Any] = {}
-
-    def has_local(self, name: str) -> bool:
-        return name in self.values
-
-    def get(self, name: str) -> Any:
-        if name in self.values:
-            return self.values[name]
-        if self.parent is not None:
-            return self.parent.get(name)
-        raise KeyError(name)
-
-    def set(self, name: str, value: Any) -> None:
-        # Set walks upward if variable already exists.
-        if name in self.values:
-            self.values[name] = value
-            return
-        if self.parent is not None and self.parent.contains(name):
-            self.parent.set(name, value)
-            return
-        self.values[name] = value
-
-    def contains(self, name: str) -> bool:
-        if name in self.values:
-            return True
-        if self.parent is not None:
-            return self.parent.contains(name)
-        return False
+from .runtime_types import (
+    Pointer, Function, ClassObj, Instance, NativeFunction, NativeInstance, Environment, Module,
+    _ReturnSignal, _BreakSignal, _ContinueSignal, _RespondSignal, _RedirectSignal, _VerbaRequest
+)
 
 
 class Interpreter:
     def __init__(self):
         self.globals = Environment()
-        self.functions: dict[str, Function] = {}
-        self.classes: dict[str, ClassObj] = {}
         self._http_routes: dict[tuple[str, str], tuple] = {}
         self._inject_stdlib()
 
@@ -176,6 +31,15 @@ class Interpreter:
         from verba.stdlib import os as _os_mod
         from verba.stdlib import time as _time_mod
         from verba.stdlib import env as _env_mod
+        from verba.stdlib import random as _random_mod
+        from verba.stdlib import base64 as _base64_mod
+        from verba.stdlib import regex as _regex_mod
+        from verba.stdlib import datetime as _datetime_mod
+        from verba.stdlib import db as _db_mod
+        from verba.stdlib import crypto as _crypto_mod
+        from verba.stdlib import csv as _csv_mod
+        from verba.stdlib import xml as _xml_mod
+        from verba.stdlib import gui as _gui_mod
         for mod_name, mod in [
             ("http",    _http_mod),
             ("browser", _browser_mod),
@@ -186,6 +50,15 @@ class Interpreter:
             ("os",      _os_mod),
             ("time",    _time_mod),
             ("env",     _env_mod),
+            ("random",  _random_mod),
+            ("base64",  _base64_mod),
+            ("regex",   _regex_mod),
+            ("datetime",_datetime_mod),
+            ("db",      _db_mod),
+            ("crypto",  _crypto_mod),
+            ("csv",     _csv_mod),
+            ("xml",     _xml_mod),
+            ("gui",     _gui_mod),
         ]:
             needs_interp: set = getattr(mod, "NEEDS_INTERP", set())
             methods = {}
@@ -204,6 +77,55 @@ class Interpreter:
             self._exec_stmt(s, env=env)
         return None
 
+    def _has_yield(self, stmts: list[ast.Stmt]) -> bool:
+        for s in stmts:
+            if isinstance(s, ast.Yield): return True
+            if isinstance(s, ast.If):
+                if self._has_yield(s.then_body): return True
+                if s.else_body and self._has_yield(s.else_body): return True
+            if isinstance(s, (ast.Repeat, ast.While, ast.ForEach, ast.ForEachIndexed, ast.WithStmt, ast.Test)):
+                if hasattr(s, 'body') and self._has_yield(s.body): return True
+            if isinstance(s, ast.TryBlock):
+                if self._has_yield(s.try_body): return True
+                if s.catch_body and self._has_yield(s.catch_body): return True
+                if s.finally_body and self._has_yield(s.finally_body): return True
+            if isinstance(s, ast.Match):
+                for b in s.branches:
+                    if self._has_yield(b.body): return True
+                if s.else_body and self._has_yield(s.else_body): return True
+        return False
+
+    def _exec_generator(self, stmts: list[ast.Stmt], *, env: Environment) -> Any:
+        for s in stmts:
+            if isinstance(s, ast.Yield):
+                yield self._eval_expr(s.value, env=env, context="general")
+            elif isinstance(s, ast.If):
+                if self._eval_bool(s.condition, env=env): yield from self._exec_generator(s.then_body, env=env)
+                elif s.else_body: yield from self._exec_generator(s.else_body, env=env)
+            elif isinstance(s, ast.Repeat):
+                n = int(self._to_number(self._eval_expr(s.times, env=env, context="general"), s.span.line_no))
+                for i in range(n):
+                    loop_env = Environment(parent=env)
+                    if s.index_name: loop_env.set(s.index_name, i + 1)
+                    try: yield from self._exec_generator(s.body, env=loop_env)
+                    except _ContinueSignal: pass
+                    except _BreakSignal: break
+            elif isinstance(s, ast.While):
+                while self._eval_bool(s.condition, env=env):
+                    try: yield from self._exec_generator(s.body, env=env)
+                    except _ContinueSignal: pass
+                    except _BreakSignal: break
+            elif isinstance(s, ast.ForEach):
+                lst = env.get(s.list_name)
+                for item in lst:
+                    inner = Environment(parent=env)
+                    inner.set(s.item_name, item)
+                    try: yield from self._exec_generator(s.body, env=inner)
+                    except _ContinueSignal: pass
+                    except _BreakSignal: break
+            else:
+                self._exec_stmt(s, env=env)
+
     def _exec_stmt(self, s: ast.Stmt, *, env: Environment) -> None:
         ln = s.span.line_no
         col = s.span.col
@@ -218,6 +140,58 @@ class Interpreter:
             return
 
         if isinstance(s, ast.Note):
+            return
+
+        if isinstance(s, ast.Help):
+            topic = s.topic.lower() if s.topic else ""
+            if not topic:
+                modules = [k for k, v in self.globals.values.items() if isinstance(v, NativeInstance)]
+                print("Available modules: " + ", ".join(modules))
+                print("Type 'help <name>.' to see documentation for a variable, module, function, or class.")
+                return
+            
+            # 1. Check functions
+            if topic in self.functions:
+                f = self.functions[topic]
+                print(f"--- HELP: {f.name} ---")
+                print(f"Usage: run {f.name} with {', '.join(f.params)}.")
+                if f.doc: print(f"Documentation: {f.doc}")
+                return
+            
+            # 2. Check classes
+            if topic in self.classes:
+                c = self.classes[topic]
+                print(f"--- HELP: class {c.name} ---")
+                if c.parent: print(f"Extends: {c.parent.name}")
+                print(f"Methods: {', '.join(c.methods.keys())}")
+                if c.doc: print(f"Documentation: {c.doc}")
+                return
+
+            # 3. Check modules/dotted
+            parts = topic.split(".")
+            mod_name = parts[0]
+            if mod_name in self.globals.values:
+                mod = self.globals.get(mod_name)
+                if isinstance(mod, NativeInstance):
+                    if len(parts) == 1:
+                        print(f"--- HELP: module {mod_name} ---")
+                        print("Functions: " + ", ".join(mod.methods.keys()))
+                    else:
+                        fn_name = parts[1]
+                        if fn_name in mod.methods:
+                            fn = mod.methods[fn_name]
+                            print(f"Function: {mod_name}.{fn_name}")
+                            print(f"Parameters: {', '.join(fn.params)}")
+                        else:
+                            print(f"Function '{fn_name}' not found in module '{mod_name}'.")
+                    return
+
+            # 4. Fallback check env
+            try:
+                v = env.get(topic)
+                print(f"Variable '{topic}' is of type {type(v).__name__}.")
+            except KeyError:
+                print(f"I don't know anything about '{topic}'.")
             return
 
         if isinstance(s, ast.Raise):
@@ -237,14 +211,40 @@ class Interpreter:
                 raise VerbaRuntimeError(msg, line_no=ln, col=col, line=raw)
             return
 
+        if isinstance(s, ast.Test):
+            print(f"Running test \"{s.name}\"...")
+            # Run in a fresh env but with globals access
+            test_env = Environment(parent=self.globals)
+            try:
+                 self._exec_block(s.body, env=test_env)
+                 print(f"  Result: PASSED.")
+            except VerbaRuntimeError as e:
+                 print(f"  Result: FAILED: {e}")
+            return
+
+        if isinstance(s, ast.WithStmt):
+            val = self._eval_expr(s.expr, env=env, context="general")
+            with_env = Environment(parent=env)
+            with_env.set(s.var_name, val)
+            try:
+                self._exec_block(s.body, env=with_env)
+            finally:
+                # If the value has a close method, call it
+                if isinstance(val, Instance) and "close" in val.cls.methods:
+                    self._call_method(val, "close", [], {}, caller_env=env, line_no=ln)
+                elif isinstance(val, NativeInstance) and "close" in val.methods:
+                    self._call_native_method(val, "close", [], {}, caller_env=env, line_no=ln)
+            return
+
+
         if isinstance(s, ast.Match):
-            subject = self._eval_expr(s.subject, env=env, context="general")
-            for branch in s.branches:
-                val = self._eval_expr(branch.value, env=env, context="general")
-                if subject == val:
-                    self._exec_block(branch.body, env=env)
+            subject_val = self._eval_expr(s.subject, env=env, context="general")
+            for br in s.branches:
+                match_env = Environment(parent=env)
+                if self._match_pattern(br.pattern, subject_val, match_env):
+                    self._exec_block(br.body, env=match_env)
                     return
-            if s.else_body is not None:
+            if s.else_body:
                 self._exec_block(s.else_body, env=env)
             return
 
@@ -366,10 +366,10 @@ class Interpreter:
 
         if isinstance(s, ast.ForEach):
             if not env.contains(s.list_name):
-                raise VerbaRuntimeError(f"The list called {s.list_name} has not been defined yet.", line_no=ln, col=col, line=raw)
+                raise VerbaRuntimeError(f"The iterator called {s.list_name} has not been defined yet.", line_no=ln, col=col, line=raw)
             lst = env.get(s.list_name)
-            if not isinstance(lst, list):
-                raise VerbaRuntimeError(f"The variable called {s.list_name} is not a list.", line_no=ln, col=col, line=raw)
+            if not getattr(lst, '__iter__', False):
+                raise VerbaRuntimeError(f"The variable called {s.list_name} is not iterable.", line_no=ln, col=col, line=raw)
             for item in lst:
                 inner = Environment(parent=env)
                 inner.set(s.item_name, item)
@@ -383,10 +383,10 @@ class Interpreter:
 
         if isinstance(s, ast.ForEachIndexed):
             if not env.contains(s.list_name):
-                raise VerbaRuntimeError(f"The list called {s.list_name} has not been defined yet.", line_no=ln, col=col, line=raw)
+                raise VerbaRuntimeError(f"The iterator called {s.list_name} has not been defined yet.", line_no=ln, col=col, line=raw)
             lst = env.get(s.list_name)
-            if not isinstance(lst, list):
-                raise VerbaRuntimeError(f"The variable called {s.list_name} is not a list.", line_no=ln, col=col, line=raw)
+            if not getattr(lst, '__iter__', False):
+                raise VerbaRuntimeError(f"The variable called {s.list_name} is not iterable.", line_no=ln, col=col, line=raw)
             for idx, item in enumerate(lst, start=1):
                 inner = Environment(parent=env)
                 inner.set(s.item_name, item)
@@ -459,9 +459,28 @@ class Interpreter:
             return
 
         if isinstance(s, ast.Define):
-            fn = Function(s.name, s.params, s.body)
+            # The first 'note' statement in the body is the docstring.
+            doc = s.doc
+            body_stmts = []
+            for stmt in s.body:
+                if isinstance(stmt, ast.Note) and doc is None:
+                    doc = stmt.text
+                else:
+                    body_stmts.append(stmt)
+
+            # Reconstruct the AST node with the stripped body and found docstring
+            # We don't overwrite the AST node in place generally, but here we can
+            # just store a modified Function object.
+            fn = Function(
+                name=s.name,
+                params=s.params,
+                body=body_stmts,
+                decorators=s.decorators,
+                doc=doc
+            )
             fn.defaults = {k: self._eval_expr(v, env=env, context="general") for k, v in (s.defaults or {}).items()}
-            self.functions[s.name] = fn
+            # Store scoped to current environment
+            env.functions[s.name] = fn
             return
 
         if isinstance(s, ast.GiveBack):
@@ -472,7 +491,7 @@ class Interpreter:
             raise _ReturnSignal(value)
 
         if isinstance(s, ast.Run):
-            self._call(s.name, s.args, caller_env=env, line_no=ln)
+            self._eval_expr(s, env=env, context="general")
             return
 
         if isinstance(s, ast.MultiAssign):
@@ -484,13 +503,13 @@ class Interpreter:
             if isinstance(rhs, _Lit) and isinstance(rhs.value, (_LROR, _LROM)):
                 inner = rhs.value
                 if isinstance(inner, _LROR):
-                    result = self._call(inner.func_name, inner.args, caller_env=env, line_no=ln)
+                    result = self._call(inner.func_name, inner.args, inner.kwargs, caller_env=env, line_no=ln)
                 else:
                     obj = env.get(inner.obj_name) if env.contains(inner.obj_name) else None
                     if isinstance(obj, NativeInstance):
-                        result = self._call_native_method(obj, inner.method, inner.args, caller_env=env, line_no=ln)
+                        result = self._call_native_method(obj, inner.method, inner.args, inner.kwargs, caller_env=env, line_no=ln)
                     else:
-                        result = self._call_method(obj, inner.method, inner.args, caller_env=env, line_no=ln)
+                        result = self._call_method(obj, inner.method, inner.args, inner.kwargs, caller_env=env, line_no=ln)
             else:
                 result = self._eval_expr(rhs, env=env, context="general")
             # Unpack
@@ -501,7 +520,7 @@ class Interpreter:
             return
 
         if isinstance(s, ast.LetResultOfRun):
-            value = self._call(s.func_name, s.args, caller_env=env, line_no=ln)
+            value = self._call(s.func_name, s.args, s.kwargs, caller_env=env, line_no=ln)
             env.set(s.target_name, value)
             return
 
@@ -544,18 +563,36 @@ class Interpreter:
             return
 
         if isinstance(s, ast.Import):
-            filename = self._eval_expr(s.filename, env=env, context="general")
-            try:
-                path = str(filename)
-                with open(path, "r", encoding="utf-8") as f:
-                    content = f.read()
-            except OSError:
-                raise VerbaRuntimeError(f"I could not open the file called {filename}.", line_no=ln, col=col, line=raw)
+            filename = str(self._eval_expr(s.filename, env=env, context="general"))
+            if not filename.endswith(".vrb"):
+                filename += ".vrb"
+
+            from pathlib import Path
+            search_paths = [Path(filename), Path("modules") / filename]
+            content = None
+            for p in search_paths:
+                if p.exists():
+                    content = p.read_text(encoding="utf-8")
+                    break
+
+            if content is None:
+                raise VerbaRuntimeError(f"I could not find the file called {filename}.", line_no=ln, col=col, line=raw)
+            
             from .parser import parse
             from .errors import VerbaParseError
+            from .runtime_types import Module
             try:
                 prog = parse(content)
-                self._exec_block(prog, env=env)
+                if s.alias:
+                    # Execute in a fresh global scope (but with access to core globals?)
+                    # For simplicity, just fresh
+                    mod_env = Environment(parent=self.globals)
+                    self._exec_block(prog, env=mod_env)
+                    # Bind as a Module object
+                    env.set(s.alias, Module(s.alias, mod_env))
+                else:
+                    # Legacy: execute in current env
+                    self._exec_block(prog, env=env)
             except VerbaParseError as e:
                 raise VerbaRuntimeError(f"Error parsing imported file {filename}: {e}", line_no=ln, col=col, line=raw)
             return
@@ -601,7 +638,7 @@ class Interpreter:
             return
 
         if isinstance(s, ast.ClassDef):
-            parent = self.classes.get(s.parent_name) if s.parent_name else None
+            parent = env.get_class(s.parent_name) if s.parent_name else None
             if s.parent_name and parent is None:
                 raise VerbaRuntimeError(f"Parent class {s.parent_name} has not been defined.", line_no=ln)
             # Inherit parent methods, child overrides take precedence
@@ -610,13 +647,13 @@ class Interpreter:
             # Merge fields: parent fields first, then child fields override
             merged_fields = dict(parent.field_defaults or {}) if parent else {}
             merged_fields.update(s.fields or {})
-            cls_obj = ClassObj(s.name, merged, parent)
+            cls_obj = ClassObj(s.name, merged, parent, doc=s.doc)
             # Evaluate field default expressions and store values
             cls_obj.field_defaults = {
                 k: self._eval_expr(v, env=env, context="general")
                 for k, v in merged_fields.items()
             }
-            self.classes[s.name] = cls_obj
+            env.classes[s.name] = cls_obj
             return
 
         if isinstance(s, ast.ObjectPropSet):
@@ -632,24 +669,17 @@ class Interpreter:
             return
 
         if isinstance(s, ast.MethodCall):
-            obj = env.get(s.obj_name) if env.contains(s.obj_name) else None
-            if isinstance(obj, NativeInstance):
-                self._call_native_method(obj, s.method, s.args, caller_env=env, line_no=ln)
-                return
-            if not isinstance(obj, Instance):
-                raise VerbaRuntimeError(f"Variable {s.obj_name} is not an object.", line_no=ln, col=col, line=raw)
-            self._call_method(obj, s.method, s.args, caller_env=env, line_no=ln)
+            self._eval_expr(s, env=env, context="general")
             return
 
         if isinstance(s, ast.LetResultOfMethod):
             obj = env.get(s.obj_name) if env.contains(s.obj_name) else None
-            if isinstance(obj, NativeInstance):
-                val = self._call_native_method(obj, s.method, s.args, caller_env=env, line_no=ln)
-                env.set(s.target_name, val)
-                return
-            if not isinstance(obj, Instance):
-                raise VerbaRuntimeError(f"Variable {s.obj_name} is not an object.", line_no=ln, col=col, line=raw)
-            val = self._call_method(obj, s.method, s.args, caller_env=env, line_no=ln)
+            val = self._call_method(obj, s.method, s.args, s.kwargs, caller_env=env, line_no=ln)
+            env.set(s.target_name, val)
+            return
+
+        if isinstance(s, ast.LetResultOfRun):
+            val = self._call(s.func_name, s.args, s.kwargs, caller_env=env, line_no=ln)
             env.set(s.target_name, val)
             return
 
@@ -791,6 +821,13 @@ class Interpreter:
         col = e.span.col
         raw = e.span.line_content
 
+        if isinstance(e, ast.Run):
+            return self._call(e.name, e.args, e.kwargs, caller_env=env, line_no=ln)
+
+        if isinstance(e, ast.MethodCall):
+            obj = env.get(e.obj_name) if env.contains(e.obj_name) else None
+            return self._call_method(obj, e.method, e.args, e.kwargs, caller_env=env, line_no=ln)
+
         if isinstance(e, ast.StringConcat):
             return "".join(self._to_word(self._eval_expr(p, env=env, context="say")) for p in e.parts)
 
@@ -814,23 +851,64 @@ class Interpreter:
             return ptr.get()
 
         if isinstance(e, ast.ObjectNew):
-            if e.class_name not in self.classes:
+            cls = env.get_class(e.class_name)
+            if cls is None:
                 raise VerbaRuntimeError(f"Class {e.class_name} has not been defined.", line_no=ln)
-            cls = self.classes[e.class_name]
             inst = Instance(cls)
-            # Initialize class-level field defaults (already evaluated, so copy them)
             import copy
             for fname, fval in cls.field_defaults.items():
-                # Deep-copy mutable defaults (lists, dicts) so instances don't share them
                 inst.props[fname] = copy.deepcopy(fval)
             if "init" in cls.methods:
-                self._call_method(inst, "init", e.args, caller_env=env, line_no=ln)
-            elif e.args:
+                self._call_method(inst, "init", e.args, e.kwargs, caller_env=env, line_no=ln)
+            elif e.args or e.kwargs:
                 raise VerbaRuntimeError(f"Class {e.class_name} does not have an init method but arguments were passed.", line_no=ln)
             return inst
 
         if isinstance(e, ast.MapLiteral):
-            return {k: self._eval_expr(v, env=env, context="general") for k, v in e.pairs}
+            res = {}
+            for k_expr, v_expr in e.pairs:
+                k = self._eval_expr(k_expr, env=env, context="general")
+                v = self._eval_expr(v_expr, env=env, context="general")
+                res[k] = v
+            return res
+
+        if isinstance(e, ast.ListLiteral):
+            return [self._eval_expr(v, env=env, context="general") for v in e.values]
+
+        if isinstance(e, ast.ListComprehension):
+            source = self._eval_expr(e.list_expr, env=env, context="general")
+            if not isinstance(source, list):
+                raise VerbaRuntimeError("Comprenhension 'in' must be followed by a list.", line_no=ln)
+            out = []
+            for item in source:
+                loop_env = Environment(parent=env)
+                loop_env.set(e.var_name, item)
+                if e.cond_expr is None or self._eval_bool(e.cond_expr, env=loop_env):
+                    out.append(self._eval_expr(e.result_expr, env=loop_env, context="general"))
+            return out
+
+        if isinstance(e, ast.MapComprehension):
+            source = self._eval_expr(e.list_expr, env=env, context="general")
+            # maps can be built from lists or other maps
+            items = source.items() if isinstance(source, dict) else source
+            out = {}
+            for item in items:
+                loop_env = Environment(parent=env)
+                if isinstance(source, dict):
+                    loop_env.set(e.key_var, item[0])
+                    loop_env.set(e.val_var, item[1])
+                elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                    loop_env.set(e.key_var, item[0])
+                    loop_env.set(e.val_var, item[1])
+                else:
+                    loop_env.set(e.key_var, item)
+                    loop_env.set(e.val_var, item)
+                
+                if e.cond_expr is None or self._eval_bool(e.cond_expr, env=loop_env):
+                    k = self._eval_expr(e.key_expr, env=loop_env, context="general")
+                    v = self._eval_expr(e.val_expr, env=loop_env, context="general")
+                    out[k] = v
+            return out
 
         if isinstance(e, ast.ObjectPropGet):
             if e.obj_name == "self":
@@ -843,7 +921,7 @@ class Interpreter:
                     obj = obj.props.get(prop_part)
                 elif isinstance(obj, dict):
                     obj = obj.get(prop_part)
-                elif isinstance(obj, (Instance, _VerbaRequest)):
+                elif isinstance(obj, (Instance, _VerbaRequest, Module)):
                     obj = obj.props.get(prop_part)
                 else:
                     raise VerbaRuntimeError(f"Cannot access property '{prop_part}' on a non-object.", line_no=ln)
@@ -899,10 +977,39 @@ class Interpreter:
 
         raise VerbaRuntimeError("I did not understand that value.", line_no=ln)
 
+    def _match_pattern(self, pattern: ast.MatchPattern, subject: Any, env: Environment) -> bool:
+        if isinstance(pattern, ast.ValuePattern):
+            expected = self._eval_expr(pattern.value, env=env, context="general")
+            return subject == expected
+        if isinstance(pattern, ast.VariablePattern):
+            # Bind the variable in the match environment
+            env.set(pattern.name, subject)
+            return True
+        if isinstance(pattern, ast.ListPattern):
+            if not isinstance(subject, list) or len(subject) != len(pattern.patterns):
+                return False
+            for p, s in zip(pattern.patterns, subject):
+                if not self._match_pattern(p, s, env):
+                    return False
+            return True
+        if isinstance(pattern, ast.MapPattern):
+            if not isinstance(subject, dict):
+                return False
+            for k, p in pattern.pairs:
+                if k not in subject:
+                    return False
+                if not self._match_pattern(p, subject[k], env):
+                    return False
+            return True
+        return False
+
     def _eval_bool(self, b: ast.BoolExpr, *, env: Environment) -> bool:
         ln = b.span.line_no
         col = b.span.col
         raw = b.span.line_content
+
+        if isinstance(b, ast.BoolExprFromExpr):
+            return bool(self._eval_expr(b.expr, env=env, context="general"))
         if isinstance(b, ast.Compare):
             left = self._eval_expr(b.left, env=env, context="general")
             right = self._eval_expr(b.right, env=env, context="general")
@@ -942,49 +1049,118 @@ class Interpreter:
             return self._eval_bool(b.left, env=env) or self._eval_bool(b.right, env=env)
         raise VerbaRuntimeError("I did not understand that condition.", line_no=ln, col=col, line=raw)
 
-    def _call(self, name: str, args: list[ast.Expr], *, caller_env: Environment, line_no: int) -> Any:
-        if name not in self.functions:
+    def _call(self, name: str, args: list[ast.Expr], kwargs: Optional[dict[str, ast.Expr]] = None, *, caller_env: Environment, line_no: int) -> Any:
+        fn = caller_env.get_function(name)
+        if fn is None:
             raise VerbaRuntimeError(f"I cannot run the function called {name} because it has not been defined.", line_no=line_no)
-        fn = self.functions[name]
-        # Fill in defaults for missing trailing args
+        
         evaled_args = [self._eval_expr(a, env=caller_env, context="general") for a in args]
-        if len(evaled_args) < len(fn.params):
-            for p in fn.params[len(evaled_args):]:
-                if p in fn.defaults:
-                    evaled_args.append(fn.defaults[p])
-                else:
-                    raise VerbaRuntimeError(
-                        f"The function called {name} needs {len(fn.params)} value(s), but you gave {len(args)}.",
-                        line_no=line_no,
-                    )
-        if len(evaled_args) != len(fn.params):
-            raise VerbaRuntimeError(
-                f"The function called {name} needs {len(fn.params)} value(s), but you gave {len(args)}.",
-                line_no=line_no,
-            )
+        evaled_kwargs = {k: self._eval_expr(v, env=caller_env, context="general") for k, v in (kwargs or {}).items()}
+        
         call_env = Environment(parent=self.globals)
-        for p, v in zip(fn.params, evaled_args):
-            call_env.set(p, v)
+        for i, p in enumerate(fn.params):
+            if p in evaled_kwargs:
+                call_env.set(p, evaled_kwargs[p])
+            elif i < len(evaled_args):
+                call_env.set(p, evaled_args[i])
+            elif p in fn.defaults:
+                call_env.set(p, fn.defaults[p])
+            else:
+                raise VerbaRuntimeError(f"Function {name} missing value for parameter {p}.", line_no=line_no)
+                
+        # Native Decorators logic
+        decs = fn.decorators or []
+        if "log" in decs:
+            print(f"[LOG] Calling {name} with args={evaled_args} kwargs={evaled_kwargs}")
+        
+        import time
+        start_time = None
+        if "time" in decs:
+            start_time = time.time()
+                
+        if self._has_yield(fn.body):
+            return self._exec_generator(fn.body, env=call_env)
+                
+        try:
+            res = None
+            self._exec_block(fn.body, env=call_env)
+        except _ReturnSignal as r:
+            res = r.value
+            
+        if "time" in decs and start_time is not None:
+            elapsed = time.time() - start_time
+            print(f"[TIME] {name} took {elapsed:.4f} seconds")
+            
+        return res
+
+    def _call_module_fn(self, mod: Module, name: str, args: list[ast.Expr], kwargs: Optional[dict[str, ast.Expr]], *, caller_env: Environment, line_no: int) -> Any:
+        fn = mod.env.functions.get(name) # only get from THAT module
+        if fn is None: raise VerbaRuntimeError(f"Module {mod.name} has no function {name}.", line_no=line_no)
+        evaled_args = [self._eval_expr(a, env=caller_env, context="general") for a in args]
+        evaled_kwargs = {k: self._eval_expr(v, env=caller_env, context="general") for k, v in (kwargs or {}).items()}
+        call_env = Environment(parent=self.globals) # Modules can see core globals
+        for i, p in enumerate(fn.params):
+            if p in evaled_kwargs: call_env.set(p, evaled_kwargs[p])
+            elif i < len(evaled_args): call_env.set(p, evaled_args[i])
+            elif p in fn.defaults: call_env.set(p, fn.defaults[p])
         try:
             self._exec_block(fn.body, env=call_env)
         except _ReturnSignal as r:
             return r.value
         return None
 
-    def _call_native_method(self, obj: NativeInstance, method_name: str, args: list[ast.Expr], *, caller_env: Environment, line_no: int) -> Any:
+    def _call_method(self, obj: Any, name: str, args: list[ast.Expr], kwargs: Optional[dict[str, ast.Expr]] = None, *, caller_env: Environment, line_no: int) -> Any:
+        if isinstance(obj, NativeInstance):
+            return self._call_native_method(obj, name, args, kwargs, caller_env=caller_env, line_no=line_no)
+        if isinstance(obj, Module):
+            return self._call_module_fn(obj, name, args, kwargs, caller_env=caller_env, line_no=line_no)
+        if not isinstance(obj, Instance):
+            raise VerbaRuntimeError(f"Cannot call method {name} on non-object.", line_no=line_no)
+        
+        cls = obj.cls
+        while cls and name not in cls.methods:
+            cls = cls.parent
+        if not cls:
+            raise VerbaRuntimeError(f"Object has no method called {name}.", line_no=line_no)
+            
+        fn = cls.methods[name]
+        evaled_args = [self._eval_expr(a, env=caller_env, context="general") for a in args]
+        evaled_kwargs = {k: self._eval_expr(v, env=caller_env, context="general") for k, v in (kwargs or {}).items()}
+        
+        call_env = Environment(parent=self.globals)
+        call_env.set("self", obj)
+        for i, p in enumerate(fn.params):
+            if p in evaled_kwargs:
+                call_env.set(p, evaled_kwargs[p])
+            elif i < len(evaled_args):
+                call_env.set(p, evaled_args[i])
+            elif p in fn.defaults:
+                call_env.set(p, fn.defaults[p])
+            # note: 'init' often has defaults handled by ClassDef, but we stick to this for consistency
+            
+        try:
+            self._exec_block(fn.body, env=call_env)
+        except _ReturnSignal as r:
+            return r.value
+        return None
+
+    def _call_native_method(self, obj: NativeInstance, method_name: str, args: list[ast.Expr], kwargs: Optional[dict[str, ast.Expr]] = None, *, caller_env: Environment, line_no: int) -> Any:
         if method_name not in obj.methods:
             raise VerbaRuntimeError(f"Module '{obj.name}' has no function called '{method_name}'.", line_no=line_no)
         nf = obj.methods[method_name]
-        # Evaluate provided args; pad missing optional args with empty string
-        evaled = [self._to_word(self._eval_expr(a, env=caller_env, context="general")) for a in args]
-        # Build positional call, injecting interpreter where needed
+        
+        evaled_args = [self._eval_expr(a, env=caller_env, context="general") for a in args]
+        evaled_kwargs = {k: self._eval_expr(v, env=caller_env, context="general") for k, v in (kwargs or {}).items()}
+        
         call_args: list[Any] = []
         arg_i = 0
         for p in nf.params:
             if p == "__interp__":
                 call_args.append(self)
-            elif arg_i < len(evaled):
-                call_args.append(evaled[arg_i])
+            elif p in evaled_kwargs:
+                call_args.append(evaled_kwargs[p])
+            elif arg_i < len(evaled_args):
+                call_args.append(evaled_args[arg_i])
                 arg_i += 1
             else:
                 call_args.append("")
@@ -999,25 +1175,6 @@ class Interpreter:
             return ni
         return result if result is not None else ""
 
-    def _call_method(self, obj: Instance, method_name: str, args: list[ast.Expr], *, caller_env: Environment, line_no: int) -> Any:
-        if method_name not in obj.cls.methods:
-             raise VerbaRuntimeError(f"Object has no method called {method_name}.", line_no=line_no)
-        fn = obj.cls.methods[method_name]
-        if len(args) != len(fn.params):
-            raise VerbaRuntimeError(
-                f"The method called {method_name} needs {len(fn.params)} value(s), but you gave {len(args)}.",
-                line_no=line_no,
-            )
-        call_env = Environment(parent=self.globals)
-        call_env.set("self", obj)
-        for p, a in zip(fn.params, args):
-            call_env.set(p, self._eval_expr(a, env=caller_env, context="general"))
-            
-        try:
-            self._exec_block(fn.body, env=call_env)
-        except _ReturnSignal as r:
-            return r.value
-        return None
 
     def _to_number(self, v: Any, line_no: int) -> float:
         if isinstance(v, bool):

@@ -76,7 +76,7 @@ def tokenize_line(line: str, line_no: int) -> LineTokens:
             continue
             
         # Handle symbols
-        if ch in ",+-*/=<>!():[]%&.":
+        if ch in ",+-*/=<>!():[]{}%&.":
             # Check for 2-char tokens
             if i + 1 < len(s):
                 pair = ch + s[i+1]
@@ -95,7 +95,7 @@ def tokenize_line(line: str, line_no: int) -> LineTokens:
         buf = []
         while i < len(s):
             ch = s[i]
-            if ch.isspace() or ch in ",+-*/=<>!():[]%&":
+            if ch.isspace() or ch in ",+-*/=<>!():[]{}%&":
                 break
             if ch == ".":
                 # Split at dot ONLY if it is at the end of the line or followed by a space

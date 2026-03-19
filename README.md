@@ -41,6 +41,20 @@ verba --repl
 
 Type `end.` on its own line to exit.
 
+## Formatter & Package Manager
+
+**Format a script:**
+```bash
+verba format examples/test.vrb
+```
+Enforces standard style and 4-space indentation across your code.
+
+**Install an external module:**
+```bash
+verba install https://raw.githubusercontent.com/.../my_module.vrb
+```
+Downloads external `.vrb` packages into a local `modules/` folder dynamically readable by `import`.
+
 ---
 
 ## Language Overview
@@ -360,10 +374,19 @@ assert x > 0 saying "x must be positive".
 
 ---
 
-### Imports
+### Imports & Namespaces
 
 ```vb
 import from file called "my_module.vrb".
+```
+
+**Namespaced Imports (`as` keyword):**
+You can alias an import to prevent global namespace collisions.
+```vb
+import from file called "my_module.vrb" as mm.
+
+the result of running mm.multiply_things with 4, 5.
+say mm.some_variable.
 ```
 
 ---
@@ -1161,3 +1184,155 @@ Then open `http://localhost:5000`. Features a calculator and a persistent counte
 - Use single-quoted strings `'...'` when your value contains double quotes (e.g. JSON literals).
 - When Verba cannot understand a line, it throws a plain-English error with a **"Did you mean?" suggestion** for similarly named variables or misspelled keywords.
 - Stop any running server with `Ctrl+C`.
+
+---
+
+## 💎 Advanced Syntax & Expressiveness
+
+Verba includes modern language features that make data transformation and control flow extremely clear.
+
+### List & Map Comprehensions
+A concise way to transform lists or dictionaries.
+
+```vb
+# List Comprehension
+squares = n * n for n in numbers.
+odds = x for x in nums if x % 2 != 0.
+
+# Map Comprehension
+names = k: v for k, v in pairs.
+```
+
+### Match with Destructuring
+Enhance your `match` statements to unpack lists or objects directly.
+
+```vb
+# List destructuring
+match point:
+    when [x, y]: say "X: {x}, Y: {y}".
+    when [x, y, z]: say "3D point!".
+end.
+
+# Map destructuring
+match res:
+    when {"status": "200", "body": b}:
+        say "Success: ", b.
+    when {"status": "404"}:
+        say "Not found".
+end.
+```
+
+### Named Parameters
+Better readability for functions with many arguments.
+
+```vb
+run save_user with name = "Alice", age = 30, active = "true".
+```
+
+### Context Managers (with)
+Ensure resources like files are closed automatically.
+
+```vb
+with file "data.txt" as f:
+    content = f.read().
+    say content.
+end.
+```
+
+
+## 📚 Standard Library expansion
+
+Verba now features an expanded set of built-in modules for everyday tasks.
+
+### Help
+Interactive self-documentation directly in the language.
+
+```vb
+help.           # General help
+help random.    # See available functions in 'random' module
+help help.      # Help on the 'help' command itself
+```
+
+### New Modules
+- **random**: `number(min, max)`, `choice(list)`, `shuffle(list)`.
+- **regex**: `match(pattern, text)`, `search(pattern, text)`, `replace(pattern, repl, text)`.
+- **base64**: `encode(text)`, `decode(text)`.
+- **datetime**: `now(format)`, `parse(text, layout)`, `format(iso_str, layout)`.
+
+
+### Advanced Data & GUI
+Modern application modules for persistence and user interaction.
+
+- **db**: SQLite interface. `db.open("path.db")` returns a connection with `.query(sql, args)` and `.execute(sql, args)`.
+- **crypto**: `crypto.hash(text)`, `crypto.generate_token(n)`, `crypto.encrypt(text, key)`.
+- **csv**: `csv.read(path)`, `csv.write(path, data_list)`.
+- **xml**: `xml.parse(xml_str)`, `xml.find(data, tag)`.
+- **gui**: `gui.window(title)` returns a window with `.button(text, callback)`, `.label(text)`, and `.show()`.
+
+### Concise Literals
+Verba now supports bracket and brace syntax for data structures in any expression:
+```vb
+# Lists
+names = ["Alice", "Bob", "Charlie"].
+
+# Maps
+config = {"theme": "dark", "port": 5000}.
+
+# Nested
+users = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}].
+```
+
+## 🚀 Advanced Concepts
+
+### 1. Iterators & Generators (`yield`)
+Functions can pause execution and return multiple items natively using the `yield` statement without keeping the entire sequence in memory. These can be naturally traversed via the `for ... in` loop.
+
+```vb
+define number_stream:
+    yield 1.
+    say "Processing...".
+    yield 2.
+    yield 3.
+end.
+
+gen = the result of running number_stream.
+for number in gen:
+    say "Got: ", number.
+end.
+```
+
+### 2. Native Decorators (`@` syntax)
+Verba supports built-in metaprogramming with native decorators. Place them directly above `define` or `async define` statements.
+
+* `@log`: Automatically logs to output when the function is initiated, printing its passed arguments.
+* `@time`: Built-in performance execution tracing. Tracks exactly how many milliseconds the execution took and logs the duration once complete.
+
+```vb
+@log
+@time
+define heavy_calculation:
+    # ... logic
+end.
+```
+
+### 3. Built-In Testing & Assertions
+Write test suites natively without needing an external testing framework running over Verba! The runtime executes tests in an isolated scoped environment but tracks global test assertions.
+
+```vb
+test "math addition works":
+    assert 1 + 1 == 2 saying "Basic math failed!".
+    assert 10 / 2 != 3.
+end.
+```
+Run `verba examples/test_units.vrb` and Verba displays automated `PASSED`/`FAILED` reporting.
+
+### 4. Docstrings & Metadata (`note`)
+A `note` placed as the absolute first line of a `define` or `class` is treated as a runtime docstring. You can access it via the `help` command or directly at Runtime introspections!
+
+```vb
+define calc_area:
+    note "Calculates the geometric area.".
+    give 10 * 10.
+end.
+```
+Then, `help calc_area.` in REPL will extract and display your detailed notes.

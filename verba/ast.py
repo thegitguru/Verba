@@ -67,14 +67,26 @@ class BoolOr(BoolExpr):
     right: BoolExpr
 
 
+@dataclass(frozen=True)
+class BoolExprFromExpr(BoolExpr):
+    """Wraps a regular Expr into a BoolExpr for use in conditions."""
+    span: Span
+    expr: Expr
+
+
 class Stmt:
     span: Span
 
 
 @dataclass(frozen=True)
+class Help(Stmt):
+    span: Span
+    topic: Optional[str] = None
+
+@dataclass(frozen=True)
 class Note(Stmt):
     span: Span
-    text: str
+    value: str
 
 
 @dataclass(frozen=True)
@@ -126,6 +138,15 @@ class If(Stmt):
     condition: BoolExpr
     then_body: list[Stmt]
     else_body: Optional[list[Stmt]] = None
+
+
+@dataclass(frozen=True)
+class WithStmt(Stmt):
+    """with <expr> as <var>: ... end."""
+    span: Span
+    expr: Expr
+    var_name: str
+    body: list[Stmt]
 
 
 @dataclass(frozen=True)
@@ -212,6 +233,12 @@ class ListSlice(Stmt):
 
 
 @dataclass(frozen=True)
+class ListLiteral(Expr):
+    span: Span
+    values: list[Expr]
+
+
+@dataclass(frozen=True)
 class ListLength(Expr):
     span: Span
     list_name: str
@@ -222,8 +249,10 @@ class Define(Stmt):
     span: Span
     name: str
     params: list[str]
-    body: list[Stmt]
-    defaults: dict = None
+    body: list['Stmt']
+    defaults: dict[str, Expr] = None
+    doc: Optional[str] = None
+    decorators: list[str] = None
 
     def __hash__(self):
         return hash((self.span, self.name, tuple(self.params)))
@@ -245,10 +274,11 @@ class GiveBack(Stmt):
 
 
 @dataclass(frozen=True)
-class Run(Stmt):
+class Run(Expr):
     span: Span
     name: str
     args: list[Expr]
+    kwargs: Optional[dict[str, Expr]] = None
 
 
 @dataclass(frozen=True)
@@ -257,6 +287,7 @@ class LetResultOfRun(Stmt):
     target_name: str
     func_name: str
     args: list[Expr]
+    kwargs: Optional[dict[str, Expr]] = None
 
 
 @dataclass(frozen=True)
@@ -283,9 +314,16 @@ class TryBlock(Stmt):
 
 
 @dataclass(frozen=True)
+class Yield(Stmt):
+    span: Span
+    value: Expr
+
+
+@dataclass(frozen=True)
 class Import(Stmt):
     span: Span
     filename: Expr
+    alias: Optional[str] = None
 
 @dataclass(frozen=True)
 class AppendToFile(Stmt):
@@ -316,12 +354,14 @@ class ClassDef(Stmt):
     methods: dict[str, Define]
     parent_name: Optional[str] = None
     fields: dict = None  # class-level default field values: {name: Expr}
+    doc: Optional[str] = None
 
 @dataclass(frozen=True)
 class ObjectNew(Expr):
     span: Span
     class_name: str
     args: list[Expr]
+    kwargs: Optional[dict[str, Expr]] = None
 
 @dataclass(frozen=True)
 class ObjectPropGet(Expr):
@@ -337,11 +377,12 @@ class ObjectPropSet(Stmt):
     value: Expr
 
 @dataclass(frozen=True)
-class MethodCall(Stmt):
+class MethodCall(Expr):
     span: Span
     obj_name: str
     method: str
     args: list[Expr]
+    kwargs: Optional[dict[str, Expr]] = None
 
 @dataclass(frozen=True)
 class LetResultOfMethod(Stmt):
@@ -350,6 +391,7 @@ class LetResultOfMethod(Stmt):
     obj_name: str
     method: str
     args: list[Expr]
+    kwargs: Optional[dict[str, Expr]] = None
 
 @dataclass(frozen=True)
 class AsyncDefine(Stmt):
@@ -357,6 +399,7 @@ class AsyncDefine(Stmt):
     name: str
     params: list[str]
     body: list[Stmt]
+    decorators: list[str] = None
 
 @dataclass(frozen=True)
 class AsyncRun(Stmt):
@@ -364,6 +407,7 @@ class AsyncRun(Stmt):
     target_name: str
     func_name: str
     args: list[Expr]
+    kwargs: Optional[dict[str, Expr]] = None
 
 @dataclass(frozen=True)
 class AwaitStmt(Stmt):
@@ -458,7 +502,36 @@ class Continue(Stmt):
 @dataclass(frozen=True)
 class MapLiteral(Expr):
     span: Span
-    pairs: list[tuple[str, "Expr"]]
+    pairs: list[tuple[Expr, Expr]]
+
+
+@dataclass(frozen=True)
+class ListComprehension(Expr):
+    """result_expr for var in list_expr [if cond_expr]"""
+    span: Span
+    result_expr: "Expr"
+    var_name: str
+    list_expr: "Expr"
+    cond_expr: Optional["Expr"] = None
+
+
+@dataclass(frozen=True)
+class MapComprehension(Expr):
+    """key_expr: val_expr for key_var, val_var in list_expr [if cond_expr]"""
+    span: Span
+    key_expr: "Expr"
+    val_expr: "Expr"
+    key_var: str
+    val_var: str
+    list_expr: "Expr"
+    cond_expr: Optional["Expr"] = None
+
+
+@dataclass(frozen=True)
+class Test(Stmt):
+    span: Span
+    name: str
+    body: list[Stmt]
 
 
 @dataclass(frozen=True)
@@ -468,9 +541,37 @@ class Assert(Stmt):
     message: Optional[str] = None
 
 
+class MatchPattern:
+    span: Span
+
+
+@dataclass(frozen=True)
+class ValuePattern(MatchPattern):
+    span: Span
+    value: Expr
+
+
+@dataclass(frozen=True)
+class VariablePattern(MatchPattern):
+    span: Span
+    name: str
+
+
+@dataclass(frozen=True)
+class ListPattern(MatchPattern):
+    span: Span
+    patterns: list[MatchPattern]
+
+
+@dataclass(frozen=True)
+class MapPattern(MatchPattern):
+    span: Span
+    pairs: list[tuple[str, MatchPattern]]
+
+
 @dataclass(frozen=True)
 class MatchBranch:
-    value: "Expr"
+    pattern: MatchPattern
     body: list["Stmt"]
 
 
