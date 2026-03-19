@@ -249,8 +249,8 @@ def _parse_atom(tokens: list[Token], tokens_lc: list[str], i: int, *, span: Span
 
     if (t.value.startswith('"') and t.value.endswith('"')) or (t.value.startswith("'") and t.value.endswith("'")):
         raw_str = t.value[1:-1].replace('\\n', '\n').replace('\\t', '\t').replace('\\r', '\r')
-        # Check for {var} interpolation
-        if '{' in raw_str:
+        # Check for {var} interpolation ONLY if double-quoted
+        if t.value.startswith('"') and '{' in raw_str:
             return _parse_interpolated(raw_str, span), i + 1
         return Literal(span, raw_str), i + 1
 
@@ -345,11 +345,20 @@ def _parse_interpolated(s: str, span: Span) -> object:
     buf = ""
     i = 0
     while i < len(s):
-        if s[i] == '{' and i + 1 < len(s) and s[i+1] != '{':
+        if s[i:i+2] == '{{':
+            buf += '{'
+            i += 2
+        elif s[i:i+2] == '}}':
+            buf += '}'
+            i += 2
+        elif s[i] == '{':
             if buf:
                 parts.append(Literal(span, buf))
                 buf = ""
-            j = s.index('}', i + 1)
+            try:
+                j = s.index('}', i + 1)
+            except ValueError:
+                raise VerbaParseError("Found an unclosed '{' in a string. To write a literal brace, use '{{'.", line_no=span.line_no)
             var = s[i+1:j].strip()
             if '.' in var:
                 dot = var.index('.')
@@ -357,12 +366,6 @@ def _parse_interpolated(s: str, span: Span) -> object:
             else:
                 parts.append(VarRef(span, var))
             i = j + 1
-        elif s[i:i+2] == '{{':
-            buf += '{'
-            i += 2
-        elif s[i:i+2] == '}}':
-            buf += '}'
-            i += 2
         else:
             buf += s[i]
             i += 1
