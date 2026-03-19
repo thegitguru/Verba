@@ -80,6 +80,12 @@ from .ast import (
     ServeRespond,
     ServeRedirect,
     StringConcat,
+    ThreadRun,
+    ThreadJoin,
+    ParallelBlock,
+    WorkerPool,
+    WorkerSend,
+    WorkerWait,
 )
 from .errors import VerbaParseError
 from .tokenize import LineTokens, tokenize_program, Token
@@ -726,7 +732,8 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         "repeat", "define", "async", "run", "let", "set", "increase",
         "decrease", "save", "load", "import", "class", "free", "delete",
         "fetch", "append", "note", "try", "otherwise", "else", "end", "give", "return",
-        "await", "deref", "serve", "on", "respond", "stop", "skip", "assert", "match", "raise"
+        "await", "deref", "serve", "on", "respond", "stop", "skip", "assert", "match", "raise",
+        "thread", "join", "parallel", "worker", "send", "wait"
     }
     is_keyword_stmt = first_val in _STATEMENT_KEYWORDS
 
@@ -1452,6 +1459,82 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         val = parse_expr(tokens[1:], line_no=line_no)
         cur.i += 1
         return Yield(span, val)
+
+    # thread <name> = run <func> [with <args>].
+    if first_val == "thread":
+        if "=" not in tokens_lc:
+            raise VerbaParseError("Expected: thread <name> = run <func> [with <args>].", line_no=line_no)
+        eq_i = tokens_lc.index("=")
+        target = _join_name(tokens[1:eq_i], line_no=line_no)
+        rest_lc = tokens_lc[eq_i+1:]
+        rest = tokens[eq_i+1:]
+        if not rest_lc or rest_lc[0] != "run":
+            raise VerbaParseError("Expected 'run' after '=' in thread statement.", line_no=line_no)
+        if "with" in rest_lc:
+            with_i = rest_lc.index("with")
+            fn = _join_name(rest[1:with_i], line_no=line_no)
+            args = [parse_expr(a, line_no=line_no) for a in _split_by_commas(rest[with_i+1:])]
+        else:
+            fn = _join_name(rest[1:], line_no=line_no)
+            args = []
+        cur.i += 1
+        return ThreadRun(span, target, fn, args)
+
+    # join <name>. / join all <name>, <name>, ...
+    if first_val == "join":
+        if tokens_lc[1:2] == ["all"]:
+            names = [t.value.lower() for t in tokens[2:] if t.value != ","]
+        else:
+            names = [t.value.lower() for t in tokens[1:] if t.value != ","]
+        cur.i += 1
+        return ThreadJoin(span, names)
+
+    # parallel: ... end.
+    if first_val == "parallel":
+        if term_val != ":":
+            raise VerbaParseError("A parallel block must end with ':'", line_no=line_no)
+        cur.i += 1
+        body = _parse_block(cur, expected_indent=expected_indent + 4)
+        if cur.i >= len(cur.lines):
+            raise VerbaParseError("I expected 'end.'", line_no=line_no)
+        end_line = cur.lines[cur.i]
+        end_no = cur.i + 1
+        if end_line.indent != expected_indent or not end_line.tokens or end_line.tokens[0].value.lower() != "end":
+            raise VerbaParseError("I expected 'end.'", line_no=end_no)
+        _require_period(end_line, end_no)
+        cur.i += 1
+        return ParallelBlock(span, body)
+
+    # worker <name> = <n> workers.
+    if first_val == "worker" and "=" in tokens_lc and "workers" in tokens_lc:
+        eq_i = tokens_lc.index("=")
+        target = _join_name(tokens[1:eq_i], line_no=line_no)
+        workers_i = tokens_lc.index("workers")
+        size_expr = parse_expr(tokens[eq_i+1:workers_i], line_no=line_no)
+        cur.i += 1
+        return WorkerPool(span, target, size_expr)
+
+    # send <pool> do <func> [with <args>].
+    if first_val == "send" and "do" in tokens_lc:
+        do_i = tokens_lc.index("do")
+        pool_name = _join_name(tokens[1:do_i], line_no=line_no)
+        rest = tokens[do_i+1:]
+        rest_lc = tokens_lc[do_i+1:]
+        if "with" in rest_lc:
+            with_i = rest_lc.index("with")
+            fn = _join_name(rest[:with_i], line_no=line_no)
+            args = [parse_expr(a, line_no=line_no) for a in _split_by_commas(rest[with_i+1:])]
+        else:
+            fn = _join_name(rest, line_no=line_no)
+            args = []
+        cur.i += 1
+        return WorkerSend(span, pool_name, fn, args)
+
+    # wait for <pool>.
+    if tokens_lc[:2] == ["wait", "for"]:
+        pool_name = _join_name(tokens[2:], line_no=line_no)
+        cur.i += 1
+        return WorkerWait(span, pool_name)
 
     # serve on port <expr>.
     if tokens_lc[:3] == ["serve", "on", "port"]:

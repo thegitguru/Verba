@@ -582,3 +582,47 @@ class Match(Stmt):
     branches: list[MatchBranch]
     else_body: Optional[list["Stmt"]] = None
 
+
+# --- Concurrency nodes ---
+
+@dataclass(frozen=True)
+class ThreadRun(Stmt):
+    """thread <name> = run <func> [with <args>]."""
+    span: Span
+    target_name: str
+    func_name: str
+    args: list[Expr]
+
+@dataclass(frozen=True)
+class ThreadJoin(Stmt):
+    """join <thread_var>."""
+    span: Span
+    names: list[str]   # one or many: join t1.  /  join all t1, t2, t3.
+
+@dataclass(frozen=True)
+class ParallelBlock(Stmt):
+    """parallel: ... end.  — runs each top-level run/call in its own thread."""
+    span: Span
+    body: list[Stmt]
+
+@dataclass(frozen=True)
+class WorkerPool(Stmt):
+    """worker <name> = <n> workers."""
+    span: Span
+    target_name: str
+    size: Expr
+
+@dataclass(frozen=True)
+class WorkerSend(Stmt):
+    """send <pool> do <func> [with <args>]."""
+    span: Span
+    pool_name: str
+    func_name: str
+    args: list[Expr]
+
+@dataclass(frozen=True)
+class WorkerWait(Stmt):
+    """wait for <pool>."""
+    span: Span
+    pool_name: str
+

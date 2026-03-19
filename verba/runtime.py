@@ -712,6 +712,102 @@ class Interpreter:
             env.set(s.target_name, task)
             threading.Thread(target=_async_worker).start()
             return
+
+        if isinstance(s, ast.ThreadRun):
+            import threading
+            from .runtime_types import VerbaThread
+            evaled_args = [self._eval_expr(a, env=env, context="general") for a in s.args]
+            fn_name = s.func_name
+            result_box = {"result": None, "error": None, "done": False}
+            def _thread_worker(fn=fn_name, args=evaled_args, box=result_box):
+                try:
+                    fn_obj = env.get_function(fn)
+                    if fn_obj is None:
+                        raise VerbaRuntimeError(f"Function '{fn}' not defined.", line_no=ln)
+                    call_env = Environment(parent=self.globals)
+                    for i, p in enumerate(fn_obj.params):
+                        call_env.set(p, args[i] if i < len(args) else fn_obj.defaults.get(p))
+                    try:
+                        self._exec_block(fn_obj.body, env=call_env)
+                    except _ReturnSignal as r:
+                        box["result"] = r.value
+                except Exception as e:
+                    box["error"] = e
+                finally:
+                    box["done"] = True
+            t = threading.Thread(target=_thread_worker, daemon=True)
+            t.start()
+            env.set(s.target_name, VerbaThread(t, result_box))
+            return
+
+        if isinstance(s, ast.ThreadJoin):
+            from .runtime_types import VerbaThread
+            for name in s.names:
+                obj = env.get(name) if env.contains(name) else None
+                if isinstance(obj, VerbaThread):
+                    result = obj.join()
+                    env.set(name + "_result", result if result is not None else "")
+                elif isinstance(obj, dict) and "done" in obj:
+                    import time
+                    while not obj["done"]:
+                        time.sleep(0.01)
+            return
+
+        if isinstance(s, ast.ParallelBlock):
+            import threading
+            threads = []
+            errors = []
+            for stmt in s.body:
+                def _run_stmt(st=stmt):
+                    try:
+                        self._exec_stmt(st, env=env)
+                    except Exception as e:
+                        errors.append(e)
+                t = threading.Thread(target=_run_stmt, daemon=True)
+                t.start()
+                threads.append(t)
+            for t in threads:
+                t.join()
+            if errors:
+                raise VerbaRuntimeError(str(errors[0]), line_no=ln)
+            return
+
+        if isinstance(s, ast.WorkerPool):
+            from .runtime_types import VerbaWorkerPool
+            size = int(self._to_number(self._eval_expr(s.size, env=env, context="general"), ln))
+            env.set(s.target_name, VerbaWorkerPool(size))
+            print(f"[workers] pool '{s.target_name}' started with {size} workers.")
+            return
+
+        if isinstance(s, ast.WorkerSend):
+            from .runtime_types import VerbaWorkerPool
+            pool = env.get(s.pool_name) if env.contains(s.pool_name) else None
+            if not isinstance(pool, VerbaWorkerPool):
+                raise VerbaRuntimeError(f"'{s.pool_name}' is not a worker pool.", line_no=ln)
+            evaled_args = [self._eval_expr(a, env=env, context="general") for a in s.args]
+            fn_name = s.func_name
+            fn_obj = env.get_function(fn_name)
+            if fn_obj is None:
+                raise VerbaRuntimeError(f"Function '{fn_name}' not defined.", line_no=ln)
+            def _task(fn=fn_obj, args=evaled_args):
+                call_env = Environment(parent=self.globals)
+                for i, p in enumerate(fn.params):
+                    call_env.set(p, args[i] if i < len(args) else fn.defaults.get(p))
+                try:
+                    self._exec_block(fn.body, env=call_env)
+                except _ReturnSignal:
+                    pass
+            pool.send(_task, [])
+            return
+
+        if isinstance(s, ast.WorkerWait):
+            from .runtime_types import VerbaWorkerPool
+            pool = env.get(s.pool_name) if env.contains(s.pool_name) else None
+            if not isinstance(pool, VerbaWorkerPool):
+                raise VerbaRuntimeError(f"'{s.pool_name}' is not a worker pool.", line_no=ln)
+            pool.wait()
+            print(f"[workers] pool '{s.pool_name}' finished all tasks.")
+            return
             
         if isinstance(s, ast.AwaitStmt):
             import time

@@ -1,0 +1,57 @@
+note concurrency.vrb — threads, parallel, and worker pool demo
+
+/- ── 1. THREADS ─────────────────────────────────────────────────
+
+define fetch_site needing label:
+    say "thread starting: ", label.
+    run time.sleep with 100.
+    say "thread done: ", label.
+    give join "result from ", label.
+end.
+
+say "=== Threads ===".
+thread t1 = run fetch_site with "site-A".
+thread t2 = run fetch_site with "site-B".
+thread t3 = run fetch_site with "site-C".
+
+say "main thread continues while t1/t2/t3 run...".
+
+join all t1, t2, t3.
+say "all threads joined.".
+say.
+
+/- ── 2. PARALLEL BLOCK ──────────────────────────────────────────
+
+define job needing name:
+    say "parallel job: ", name.
+    run time.sleep with 50.
+    say "parallel job done: ", name.
+end.
+
+say "=== Parallel Block ===".
+parallel:
+    run job with "alpha".
+    run job with "beta".
+    run job with "gamma".
+end.
+say "parallel block complete.".
+say.
+
+/- ── 3. WORKER POOL ─────────────────────────────────────────────
+
+define process_item needing item:
+    say "worker processing: ", item.
+    run time.sleep with 80.
+    say "worker done: ", item.
+end.
+
+say "=== Worker Pool ===".
+worker pool = 3 workers.
+
+items = a list of 1, 2, 3, 4, 5, 6.
+for item in items:
+    send pool do process_item with item.
+end.
+
+wait for pool.
+say "all worker tasks complete.".

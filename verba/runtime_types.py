@@ -109,5 +109,64 @@ class Module:
         self.name = name
         self.env = env
         self.cls = None
-        self.props = env.values  # Expose variables as properties
-        self.methods = env.functions # Expose functions as methods
+        self.props = env.values
+        self.methods = env.functions
+
+
+class VerbaThread:
+    """Represents a running thread spawned by 'thread x = run func.'"""
+    def __init__(self, thread, result_box: dict):
+        self.thread = thread
+        self.result_box = result_box  # {"result": ..., "error": ..., "done": bool}
+        self.cls = None
+        self.props: dict = {}
+
+    def join(self) -> Any:
+        self.thread.join()
+        if self.result_box["error"]:
+            raise self.result_box["error"]
+        return self.result_box["result"]
+
+
+class VerbaWorkerPool:
+    """A fixed-size thread pool that processes tasks from a queue."""
+    import queue as _queue_mod
+
+    def __init__(self, size: int):
+        import queue
+        import threading
+        self.size = size
+        self._queue: queue.Queue = queue.Queue()
+        self._threads: list = []
+        self.cls = None
+        self.props: dict = {}
+        for _ in range(size):
+            t = threading.Thread(target=self._worker, daemon=True)
+            t.start()
+            self._threads.append(t)
+
+    def _worker(self):
+        while True:
+            task = self._queue.get()
+            if task is None:
+                break
+            fn, args = task
+            try:
+                fn(*args)
+            except Exception:
+                pass
+            finally:
+                self._queue.task_done()
+
+    def send(self, fn, args: list):
+        self._queue.put((fn, args))
+
+    def wait(self):
+        """Block until all queued tasks are done."""
+        self._queue.join()
+
+    def shutdown(self):
+        for _ in self._threads:
+            self._queue.put(None)
+        for t in self._threads:
+            t.join()
