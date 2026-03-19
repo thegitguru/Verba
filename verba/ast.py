@@ -152,6 +152,17 @@ class ForEach(Stmt):
 
 
 @dataclass(frozen=True)
+class ForRange(Stmt):
+    """for i from <start> to <end> [step <step>]:  ...body...  end."""
+    span: Span
+    var_name: str
+    start: Expr
+    end: Expr
+    step: Optional[Expr]
+    body: list["Stmt"]
+
+
+@dataclass(frozen=True)
 class ForEachIndexed(Stmt):
     span: Span
     item_name: str
@@ -180,6 +191,24 @@ class ListItemGet(Stmt):
     target_name: str
     index: Expr
     list_name: str
+
+
+@dataclass(frozen=True)
+class ListSort(Stmt):
+    """sort <list> [descending]."""
+    span: Span
+    list_name: str
+    descending: bool
+
+
+@dataclass(frozen=True)
+class ListSlice(Stmt):
+    """first <n> of <list> into <target>. / last <n> of <list> into <target>."""
+    span: Span
+    target_name: str
+    list_name: str
+    count: Expr
+    from_end: bool
 
 
 @dataclass(frozen=True)
@@ -241,6 +270,7 @@ class TryBlock(Stmt):
     try_body: list[Stmt]
     catch_body: Optional[list[Stmt]] = None
     error_name: Optional[str] = None
+    finally_body: Optional[list[Stmt]] = None
 
 
 @dataclass(frozen=True)
@@ -275,6 +305,7 @@ class ClassDef(Stmt):
     span: Span
     name: str
     methods: dict[str, Define]
+    parent_name: Optional[str] = None
 
 @dataclass(frozen=True)
 class ObjectNew(Expr):
@@ -395,6 +426,13 @@ class DerefSet(Stmt):
     span: Span
     name: str
     value: Expr
+
+
+@dataclass(frozen=True)
+class Raise(Stmt):
+    """raise <message_expr>."""
+    span: Span
+    message: Expr
 
 
 @dataclass(frozen=True)

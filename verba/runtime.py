@@ -39,6 +39,7 @@ class Function:
 class ClassObj:
     name: str
     methods: dict[str, ast.Define]
+    parent: Optional["ClassObj"] = None
 
 
 class Instance:
@@ -166,7 +167,21 @@ class Interpreter:
         from verba.stdlib import express as _express_mod
         from verba.stdlib import strings as _strings_mod
         from verba.stdlib import math as _math_mod
-        for mod_name, mod in [("http", _http_mod), ("browser", _browser_mod), ("express", _express_mod), ("strings", _strings_mod), ("math", _math_mod)]:
+        from verba.stdlib import json as _json_mod
+        from verba.stdlib import os as _os_mod
+        from verba.stdlib import time as _time_mod
+        from verba.stdlib import env as _env_mod
+        for mod_name, mod in [
+            ("http",    _http_mod),
+            ("browser", _browser_mod),
+            ("express", _express_mod),
+            ("strings", _strings_mod),
+            ("math",    _math_mod),
+            ("json",    _json_mod),
+            ("os",      _os_mod),
+            ("time",    _time_mod),
+            ("env",     _env_mod),
+        ]:
             needs_interp: set = getattr(mod, "NEEDS_INTERP", set())
             methods = {}
             for fn_name, (fn, params) in mod.FUNCTIONS.items():
@@ -199,6 +214,10 @@ class Interpreter:
 
         if isinstance(s, ast.Note):
             return
+
+        if isinstance(s, ast.Raise):
+            msg = self._to_word(self._eval_expr(s.message, env=env, context="general"))
+            raise VerbaRuntimeError(msg, line_no=ln, col=col, line=raw)
 
         if isinstance(s, ast.Break):
             raise _BreakSignal()
@@ -323,6 +342,23 @@ class Interpreter:
                     raise VerbaRuntimeError("This loop ran for too long. Did you forget to update the condition?", line_no=ln, col=col, line=raw)
             return
 
+        if isinstance(s, ast.ForRange):
+            start = self._to_number(self._eval_expr(s.start, env=env, context="general"), ln)
+            end   = self._to_number(self._eval_expr(s.end,   env=env, context="general"), ln)
+            step  = self._to_number(self._eval_expr(s.step,  env=env, context="general"), ln) if s.step else (1 if start <= end else -1)
+            i = start
+            while (step > 0 and i <= end) or (step < 0 and i >= end):
+                loop_env = Environment(parent=env)
+                loop_env.set(s.var_name, int(i) if float(i).is_integer() else i)
+                try:
+                    self._exec_block(s.body, env=loop_env)
+                except _ContinueSignal:
+                    pass
+                except _BreakSignal:
+                    break
+                i += step
+            return
+
         if isinstance(s, ast.ForEach):
             if not env.contains(s.list_name):
                 raise VerbaRuntimeError(f"The list called {s.list_name} has not been defined yet.", line_no=ln, col=col, line=raw)
@@ -356,6 +392,29 @@ class Interpreter:
                     continue
                 except _BreakSignal:
                     break
+            return
+
+        if isinstance(s, ast.ListSort):
+            if not env.contains(s.list_name):
+                raise VerbaRuntimeError(f"The list called {s.list_name} has not been defined yet.", line_no=ln, col=col, line=raw)
+            lst = env.get(s.list_name)
+            if not isinstance(lst, list):
+                raise VerbaRuntimeError(f"The variable called {s.list_name} is not a list.", line_no=ln, col=col, line=raw)
+            try:
+                lst.sort(reverse=s.descending)
+            except TypeError:
+                lst.sort(key=str, reverse=s.descending)
+            return
+
+        if isinstance(s, ast.ListSlice):
+            if not env.contains(s.list_name):
+                raise VerbaRuntimeError(f"The list called {s.list_name} has not been defined yet.", line_no=ln, col=col, line=raw)
+            lst = env.get(s.list_name)
+            if not isinstance(lst, list):
+                raise VerbaRuntimeError(f"The variable called {s.list_name} is not a list.", line_no=ln, col=col, line=raw)
+            n = int(self._to_number(self._eval_expr(s.count, env=env, context="general"), ln))
+            sliced = lst[-n:] if s.from_end else lst[:n]
+            env.set(s.target_name, sliced)
             return
 
         if isinstance(s, ast.ListAdd):
@@ -436,14 +495,19 @@ class Interpreter:
             return
 
         if isinstance(s, ast.TryBlock):
+            caught = False
             try:
                 self._exec_block(s.try_body, env=env)
             except VerbaRuntimeError as e:
+                caught = True
                 if s.catch_body is not None:
                     err_env = Environment(parent=env)
                     if s.error_name:
                         err_env.set(s.error_name, str(e))
                     self._exec_block(s.catch_body, env=err_env)
+            finally:
+                if s.finally_body is not None:
+                    self._exec_block(s.finally_body, env=env)
             return
 
         if isinstance(s, ast.Import):
@@ -504,7 +568,13 @@ class Interpreter:
             return
 
         if isinstance(s, ast.ClassDef):
-            self.classes[s.name] = ClassObj(s.name, s.methods)
+            parent = self.classes.get(s.parent_name) if s.parent_name else None
+            if s.parent_name and parent is None:
+                raise VerbaRuntimeError(f"Parent class {s.parent_name} has not been defined.", line_no=ln)
+            # Inherit parent methods, child overrides take precedence
+            merged = dict(parent.methods) if parent else {}
+            merged.update(s.methods)
+            self.classes[s.name] = ClassObj(s.name, merged, parent)
             return
 
         if isinstance(s, ast.ObjectPropSet):
@@ -746,19 +816,21 @@ class Interpreter:
         if isinstance(e, ast.BinaryOp):
             left = self._eval_expr(e.left, env=env, context=context)
             right = self._eval_expr(e.right, env=env, context=context)
-            if e.op in ["+", "-", "*", "/", "%"]:
+            if e.op in ["+", "-", "*", "/", "%", "**", "//"]:
                 a = self._to_number(left, ln)
                 b = self._to_number(right, ln)
-                if e.op == "+":
-                    return a + b
-                if e.op == "-":
-                    return a - b
-                if e.op == "*":
-                    return a * b
+                if e.op == "+":  return a + b
+                if e.op == "-":  return a - b
+                if e.op == "*":  return a * b
+                if e.op == "**": return a ** b
                 if e.op == "/":
                     if b == 0:
                         raise VerbaRuntimeError("I cannot divide by zero.", line_no=ln, col=col, line=raw)
                     return a / b
+                if e.op == "//":
+                    if b == 0:
+                        raise VerbaRuntimeError("I cannot divide by zero.", line_no=ln, col=col, line=raw)
+                    return float(int(a // b))
                 if e.op == "%":
                     if b == 0:
                         raise VerbaRuntimeError("I cannot divide by zero.", line_no=ln, col=col, line=raw)
@@ -778,6 +850,14 @@ class Interpreter:
                 return left is None
             if b.op == "!null":
                 return left is not None
+            if b.op == "in":
+                if not isinstance(right, list):
+                    raise VerbaRuntimeError("I expected a list after 'in'.", line_no=ln, col=col, line=raw)
+                return left in right
+            if b.op == "!in":
+                if not isinstance(right, list):
+                    raise VerbaRuntimeError("I expected a list after 'not in'.", line_no=ln, col=col, line=raw)
+                return left not in right
             if b.op in [">", "<", ">=", "<="]:
                 a = self._to_number(left, ln)
                 c = self._to_number(right, ln)

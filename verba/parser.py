@@ -19,6 +19,7 @@ from .ast import (
     Expr,
     ForEach,
     ForEachIndexed,
+    ForRange,
     GiveBack,
     If,
     Increase,
@@ -29,6 +30,8 @@ from .ast import (
     ListItemGet,
     ListLength,
     ListRemove,
+    ListSort,
+    ListSlice,
     MapLiteral,
     LoadFile,
     Note,
@@ -61,6 +64,7 @@ from .ast import (
     DerefSet,
     Break,
     Continue,
+    Raise,
     ServeStart,
     ServeRoute,
     ServeRespond,
@@ -104,6 +108,8 @@ def _join_name(tokens: list[Token], *, line_no: int = 0) -> str:
 _COMPARISONS: list[tuple[list[str], str]] = [
     (["is", "not", "null"], "!null"),
     (["is", "null"], "null"),
+    (["not", "in"], "!in"),
+    (["in"], "in"),
     (["is", "not"], "!="),
     (["does", "not", "equal"], "!="),
     (["!", "="], "!="),
@@ -135,8 +141,11 @@ _MATH_OPS: list[tuple[list[str], str]] = [
     (["minus"], "-"),
     (["-"], "-"),
     (["times"], "*"),
+    (["*", "*"], "**"),
+    (["**"], "**"),
     (["*"], "*"),
     (["divided", "by"], "/"),
+    (["/", "/"], "//"),
     (["/"], "/"),
     (["remainder", "after", "dividing", "by"], "%"),
     (["%"], "%"),
@@ -196,6 +205,9 @@ def _parse_atom(tokens: list[Token], tokens_lc: list[str], i: int, *, span: Span
 
     if (t.value.startswith('"') and t.value.endswith('"')) or (t.value.startswith("'") and t.value.endswith("'")):
         raw_str = t.value[1:-1].replace('\\n', '\n').replace('\\t', '\t').replace('\\r', '\r')
+        # Check for {var} interpolation
+        if '{' in raw_str:
+            return _parse_interpolated(raw_str, span), i + 1
         return Literal(span, raw_str), i + 1
         
     if "." in t.value and t.value.count(".") >= 1:
@@ -211,6 +223,40 @@ def _parse_atom(tokens: list[Token], tokens_lc: list[str], i: int, *, span: Span
     return VarRef(span, _join_name([t])), i + 1
 
 
+def _parse_interpolated(s: str, span: Span) -> object:
+    """Turn 'Hello {name}!' into StringConcat([Literal('Hello '), VarRef('name'), Literal('!')])."""
+    parts = []
+    buf = ""
+    i = 0
+    while i < len(s):
+        if s[i] == '{' and i + 1 < len(s) and s[i+1] != '{':
+            if buf:
+                parts.append(Literal(span, buf))
+                buf = ""
+            j = s.index('}', i + 1)
+            var = s[i+1:j].strip()
+            if '.' in var:
+                dot = var.index('.')
+                parts.append(ObjectPropGet(span, var[:dot], var[dot+1:]))
+            else:
+                parts.append(VarRef(span, var))
+            i = j + 1
+        elif s[i:i+2] == '{{':
+            buf += '{'
+            i += 2
+        elif s[i:i+2] == '}}':
+            buf += '}'
+            i += 2
+        else:
+            buf += s[i]
+            i += 1
+    if buf:
+        parts.append(Literal(span, buf))
+    if len(parts) == 1:
+        return parts[0]
+    return StringConcat(span, parts)
+
+
 def _scan_math_op(tokens_lc: list[str], i: int) -> tuple[Optional[str], int]:
     for phrase, op in _MATH_OPS:
         if _try_match(tokens_lc, i, phrase):
@@ -219,7 +265,7 @@ def _scan_math_op(tokens_lc: list[str], i: int) -> tuple[Optional[str], int]:
 
 
 def _precedence(op: str) -> int:
-    return {"*": 2, "/": 2, "%": 2, "+": 1, "-": 1}.get(op, 0)
+    return {"**": 3, "*": 2, "/": 2, "//": 2, "%": 2, "+": 1, "-": 1}.get(op, 0)
 
 
 def parse_expr(tokens: list[Token], *, line_no: int) -> Expr:
@@ -477,7 +523,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         "repeat", "define", "async", "run", "let", "set", "increase",
         "decrease", "save", "load", "import", "class", "free", "delete",
         "fetch", "append", "note", "try", "otherwise", "else", "end", "give", "return",
-        "await", "deref", "serve", "on", "respond", "stop", "skip", "assert", "match"
+        "await", "deref", "serve", "on", "respond", "stop", "skip", "assert", "match", "raise"
     }
     is_keyword_stmt = first_val in _STATEMENT_KEYWORDS
 
@@ -695,6 +741,24 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         cur.i += 1
         return Import(span, filename_expr)
 
+    # sort <list> [descending].
+    if first_val == "sort":
+        descending = "descending" in tokens_lc
+        list_name = _join_name([t for t in tokens[1:] if t.value.lower() not in ("descending",)], line_no=line_no)
+        cur.i += 1
+        return ListSort(span, list_name, descending)
+
+    # first <n> of <list> into <target>. / last <n> of <list> into <target>.
+    if first_val in ("first", "last") and "of" in tokens_lc and "into" in tokens_lc:
+        from_end = first_val == "last"
+        of_i   = tokens_lc.index("of")
+        into_i = tokens_lc.index("into")
+        count_expr = parse_expr(tokens[1:of_i], line_no=line_no)
+        list_name  = _join_name(tokens[of_i + 1 : into_i], line_no=line_no)
+        target     = _join_name(tokens[into_i + 1 :], line_no=line_no)
+        cur.i += 1
+        return ListSlice(span, target, list_name, count_expr, from_end)
+
     # list ops: add/remove
     if first_val == "add":
         _require_period(lt, line_no)
@@ -816,6 +880,29 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         cur.i += 1
         return While(span, cond, body)
 
+    # for i from <start> to <end> [step <step>]:
+    if first_val == "for" and "from" in tokens_lc and "to" in tokens_lc:
+        if term_val != ":":
+            raise VerbaParseError("A for line must end with ':'", line_no=line_no, col=tokens[-1].col, line=lt.raw)
+        var_name  = _join_name(tokens[1:tokens_lc.index("from")], line_no=line_no)
+        from_i    = tokens_lc.index("from")
+        to_i      = tokens_lc.index("to")
+        step_i    = tokens_lc.index("step") if "step" in tokens_lc else -1
+        start_expr = parse_expr(tokens[from_i + 1 : to_i], line_no=line_no)
+        end_expr   = parse_expr(tokens[to_i + 1 : step_i if step_i != -1 else len(tokens)], line_no=line_no)
+        step_expr  = parse_expr(tokens[step_i + 1 :], line_no=line_no) if step_i != -1 else None
+        cur.i += 1
+        body = _parse_block(cur, expected_indent=expected_indent + 4)
+        if cur.i >= len(cur.lines):
+            raise VerbaParseError("I expected 'end.'", line_no=line_no)
+        end_line = cur.lines[cur.i]
+        end_no = cur.i + 1
+        if end_line.indent != expected_indent or not end_line.tokens or end_line.tokens[0].value.lower() != "end":
+            raise VerbaParseError("I expected 'end.'", line_no=end_no, col=end_line.indent, line=end_line.raw)
+        _require_period(end_line, end_no)
+        cur.i += 1
+        return ForRange(span, var_name, start_expr, end_expr, step_expr, body)
+
     # for item in list:  /  for item at index in list:
     if first_val == "for" and "in" in tokens_lc:
         if term_val != ":":
@@ -855,7 +942,14 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
     if first_val == "class":
         if term_val != ":":
              raise VerbaParseError("Class definition must end with ':'", line_no=line_no, col=tokens[-1].col)
-        name = _join_name(tokens[1:], line_no=line_no)
+        # class Name: or class Name extends Parent:
+        parent_name = None
+        if "extends" in tokens_lc:
+            ext_i = tokens_lc.index("extends")
+            name = _join_name(tokens[1:ext_i], line_no=line_no)
+            parent_name = _join_name(tokens[ext_i + 1:], line_no=line_no)
+        else:
+            name = _join_name(tokens[1:], line_no=line_no)
         cur.i += 1
         body = _parse_block(cur, expected_indent=expected_indent + 4)
         methods = {}
@@ -875,7 +969,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
             raise VerbaParseError("I expected 'end.'", line_no=end_no, col=end_line.indent, line=end_line.raw)
         _require_period(end_line, end_no)
         cur.i += 1
-        return ClassDef(span, name, methods)
+        return ClassDef(span, name, methods, parent_name)
 
     # define function ...
     if first_val in ["define", "async"]:
@@ -980,6 +1074,12 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         condition = parse_condition(tokens[1:cond_end], line_no=line_no)
         cur.i += 1
         return Assert(span, condition, msg)
+
+    # raise <message>.
+    if first_val == "raise":
+        msg_expr = parse_expr(tokens[1:], line_no=line_no)
+        cur.i += 1
+        return Raise(span, msg_expr)
 
     # stop (break)
     if first_val == "stop":
@@ -1095,6 +1195,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
         try_body = _parse_block(cur, expected_indent=expected_indent + 4)
         catch_body: Optional[list[Stmt]] = None
         error_name: Optional[str] = None
+        finally_body: Optional[list[Stmt]] = None
 
         if cur.i < len(cur.lines):
             nxt = cur.lines[cur.i]
@@ -1116,7 +1217,17 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
                     )
                 cur.i += 1
                 catch_body = _parse_block(cur, expected_indent=expected_indent + 4)
-        
+
+        # optional finally:
+        if cur.i < len(cur.lines):
+            nxt = cur.lines[cur.i]
+            nxt_no = cur.i + 1
+            nxt_lc = _lc(nxt.tokens)
+            if nxt.indent == expected_indent and nxt_lc == ["finally", ":"]:
+                _require_period(nxt, nxt_no)
+                cur.i += 1
+                finally_body = _parse_block(cur, expected_indent=expected_indent + 4)
+
         if cur.i >= len(cur.lines):
             raise VerbaParseError("I expected 'end.'", line_no=line_no)
         end_line = cur.lines[cur.i]
@@ -1125,7 +1236,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
             raise VerbaParseError("I expected 'end.'", line_no=end_no, col=end_line.indent, line=end_line.raw)
         _require_period(end_line, end_no)
         cur.i += 1
-        return TryBlock(span, try_body, catch_body, error_name)
+        return TryBlock(span, try_body, catch_body, error_name, finally_body)
 
     raise VerbaParseError(
         f"I did not understand this line. Did you mean to use say, let, set, if, repeat, keep, define, run, or ask?",

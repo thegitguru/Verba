@@ -23,6 +23,13 @@ def run_file(path: Path) -> int:
     return 0
 
 
+def check_file(path: Path) -> int:
+    source = _read_text(path)
+    parse(source)
+    print(f"OK: {path}")
+    return 0
+
+
 def repl() -> int:
     print("Verba REPL. Type 'end.' on its own line to exit.")
     try:
@@ -61,13 +68,21 @@ def repl() -> int:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="verba", description="Run Verba (natural English) programs.")
     p.add_argument("file", nargs="?", help="Path to a .vrb (Verba) file.")
-    p.add_argument("--repl", action="store_true", help="Start an interactive REPL.")
+    p.add_argument("--repl",    action="store_true", help="Start an interactive REPL.")
+    p.add_argument("--version", action="store_true", help="Print version and exit.")
+    p.add_argument("--check",   action="store_true", help="Parse only — do not run.")
 
     ns = p.parse_args(argv)
+
+    if ns.version:
+        print("verba 0.1.0")
+        return 0
 
     try:
         if ns.repl or ns.file is None:
             return repl()
+        if ns.check:
+            return check_file(Path(ns.file))
         return run_file(Path(ns.file))
     except (VerbaParseError, VerbaRuntimeError) as e:
         print(e, file=sys.stderr)
