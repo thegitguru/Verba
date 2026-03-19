@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verba Documentation — Natural English Programming</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="dark-theme">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+                    <rect width="40" height="40" rx="8" fill="url(#gradient)" />
+                    <path d="M10 28V12H13.5L20 22L26.5 12H30V28H26.5V17L20 27L13.5 17V28H10Z" fill="white" />
+                    <defs>
+                        <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#8E2DE2" />
+                            <stop offset="1" stop-color="#4A00E0" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <span>Verba Docs</span>
+            </div>
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Search features...">
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <ul>
+                <li class="nav-item active"><a href="#introduction">Introduction</a></li>
+                <li class="nav-item"><a href="#installation">Installation</a></li>
+                <li class="nav-item"><a href="#cli-commands">CLI Commands</a></li>
+                <li class="nav-header">Language Basics</li>
+                <li class="nav-item"><a href="#syntax">General Syntax</a></li>
+                <li class="nav-item"><a href="#variables">Variables & Types</a></li>
+                <li class="nav-item"><a href="#arithmetic">Arithmetic</a></li>
+                <li class="nav-item"><a href="#io">Input & Output</a></li>
+                <li class="nav-header">Control Flow</li>
+                <li class="nav-item"><a href="#conditions">Conditions (If/Else)</a></li>
+                <li class="nav-item"><a href="#loops">Loops (While/Repeat/For)</a></li>
+                <li class="nav-item"><a href="#match">Pattern Matching</a></li>
+                <li class="nav-header">Data Structures</li>
+                <li class="nav-item"><a href="#lists">Lists & Collections</a></li>
+                <li class="nav-item"><a href="#maps">Maps (Dictionaries)</a></li>
+                <li class="nav-header">Functions & OOP</li>
+                <li class="nav-item"><a href="#functions">Functions</a></li>
+                <li class="nav-item"><a href="#generators">Generators</a></li>
+                <li class="nav-item"><a href="#classes">Classes & Objects</a></li>
+                <li class="nav-header">Advanced</li>
+                <li class="nav-item"><a href="#pointers">Pointers & Refs</a></li>
+                <li class="nav-item"><a href="#async">Async / Await</a></li>
+                <li class="nav-item"><a href="#errors">Error Handling</a></li>
+                <li class="nav-item"><a href="#native-ops">Native Ops (Files/Web)</a></li>
+                <li class="nav-item"><a href="#decorators">Decorators</a></li>
+                <li class="nav-item"><a href="#modules">Modules & Imports</a></li>
+                <li class="nav-header">Standard Library</li>
+                <li class="nav-item"><a href="#stdlib-strings">Strings</a></li>
+                <li class="nav-item"><a href="#stdlib-math">Math</a></li>
+                <li class="nav-item"><a href="#stdlib-json">JSON Parsing</a></li>
+                <li class="nav-item"><a href="#stdlib-crypto">Crypto & Hashing</a></li>
+                <li class="nav-item"><a href="#stdlib-http">HTTP Client</a></li>
+                <li class="nav-item"><a href="#stdlib-server">HTTP Server</a></li>
+                <li class="nav-item"><a href="#stdlib-express">Express Router</a></li>
+                <li class="nav-item"><a href="#stdlib-db">Databases</a></li>
+                <li class="nav-item"><a href="#stdlib-browser">Web Scraping</a></li>
+                <li class="nav-item"><a href="#stdlib-os">OS & Filesystem</a></li>
+                <li class="nav-item"><a href="#stdlib-time">Time & Date</a></li>
+                <li class="nav-item"><a href="#stdlib-regex">Regex & Base64</a></li>
+                <li class="nav-item"><a href="#stdlib-gui">Desktop GUI</a></li>
+                <li class="nav-header">Project Safety</li>
+                <li class="nav-item"><a href="#testing">Testing & Assert</a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="content-area">
+        <section id="introduction" class="section">
+            <div class="text-logo-wrapper">
+                <span class="verba-text-logo">VERBA</span>
+                <span class="verba-logo-tagline">v1.0 — THE NATURAL LANGUAGE</span>
+            </div>
+            <h1 class="glow-text">The Language of Humans.</h1>
+            <p class="lead">Verba is an interpreted, English-like programming language designed to be readable by anyone, even without a programming background.</p>
+            <div class="code-showcase glass">
+                <div class="code-header">
+                    <span class="dot red"></span>
+                    <span class="dot yellow"></span>
+                    <span class="dot green"></span>
+                    <span class="file-name">hello.vrb</span>
+                </div>
+                <pre><code><span class="comment">/- A clean welcome</span>
+<span class="keyword">ask</span> the user <span class="string">"What is your name?"</span> and <span class="keyword">save to</span> name.
+<span class="keyword">say</span> <span class="string">"Hello, {name}! Welcome to Verba."</span>.</code></pre>
+            </div>
+            <div class="hero-stats">
+                <div class="stat-card">
+                    <span class="stat-val">100%</span>
+                    <span class="stat-label">Readable</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-val">0.1ms</span>
+                    <span class="stat-label">Fast Execution</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-val">20+</span>
+                    <span class="stat-label">Core Modules</span>
+                </div>
+            </div>
+        </section>
+
+        <section id="installation" class="section">
+            <h2>Installation</h2>
+            <p>Verba requires <strong>Python 3.10</strong> or newer.</p>
+            <div class="terminal-box">
+                <pre><code><span class="comment"># Install locally</span>
+pip install -e .
+
+<span class="comment"># Run a script</span>
+verba run project.vrb</code></pre>
+            </div>
+        </section>
+
+        <section id="cli-commands" class="section">
+            <h2>CLI Commands</h2>
+            <p>The <code>verba</code> tool provides everything you need to manage your lifecycle.</p>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Command</th><th>Effect</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>verba run</code></td><td>Execute code.</td></tr>
+                        <tr><td><code>verba check</code></td><td>Syntax validation.</td></tr>
+                        <tr><td><code>verba repl</code></td><td>Live console.</td></tr>
+                        <tr><td><code>verba format</code></td><td>Code cleanup.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="syntax" class="section">
+            <h2>General Syntax</h2>
+            <p>Verba is designed to feel like instructions to a human.</p>
+            <div class="code-block glass">
+                <pre><code><span class="comment">/- Use a period to end statements.</span>
+say <span class="string">"Rule 1"</span>.
+<span class="comment">/- Use a colon to start blocks.</span>
+<span class="keyword">if</span> true:
+    say <span class="string">"Rule 2"</span>.
+<span class="keyword">end.</span></code></pre>
+            </div>
+        </section>
+
+        <section id="variables" class="section">
+            <h2>Variables & Types</h2>
+            <div class="code-block glass">
+                <pre><code>score = 100.
+name = <span class="string">"Alice"</span>.
+is_admin = true.
+null_vals = null.</code></pre>
+            </div>
+        </section>
+
+        <section id="arithmetic" class="section">
+            <h2>Arithmetic</h2>
+            <div class="code-block glass">
+                <pre><code>a = 10 + 5.
+b = a * 2.
+c = 10 % 3.
+d = 2 ** 8.</code></pre>
+            </div>
+        </section>
+
+        <section id="io" class="section">
+            <h2>Input & Output</h2>
+            <div class="code-block glass">
+                <pre><code><span class="keyword">say</span> <span class="string">"Hello!"</span>.
+<span class="keyword">ask</span> the user <span class="string">"Name?"</span> and <span class="keyword">save to</span> name.</code></pre>
+            </div>
+        </section>
+
+        <section id="conditions" class="section">
+            <h2>Conditions</h2>
+            <div class="code-block glass">
+                <pre><code><span class="keyword">if</span> x > 10:
+    <span class="keyword">say</span> <span class="string">"Big"</span>.
+<span class="keyword">else</span>:
+    <span class="keyword">say</span> <span class="string">"Small"</span>.
+<span class="keyword">end.</span></code></pre>
+            </div>
+        </section>
+
+        <section id="loops" class="section">
+            <h2>Loops</h2>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="showTab(event, 'while')">While</button>
+                <button class="tab-btn" onclick="showTab(event, 'repeat')">Repeat</button>
+                <button class="tab-btn" onclick="showTab(event, 'for')">For</button>
+            </div>
+            <div id="while" class="tab-content active">
+                <pre><code>i = 1.
+<span class="keyword">while</span> i <= 5:
+    <span class="keyword">say</span> i.
+    i += 1.
+<span class="keyword">end.</span></code></pre>
+            </div>
+            <div id="repeat" class="tab-content">
+                <pre><code><span class="keyword">repeat</span> 5 times:
+    <span class="keyword">say</span> <span class="string">"Again"</span>.
+<span class="keyword">end.</span></code></pre>
+            </div>
+            <div id="for" class="tab-content">
+                <pre><code><span class="keyword">for</span> item <span class="keyword">in</span> list:
+    <span class="keyword">say</span> item.
+<span class="keyword">end.</span></code></pre>
+            </div>
+        </section>
+
+        <section id="match" class="section">
+            <h2>Pattern Matching</h2>
+            <div class="code-block glass">
+                <pre><code><span class="keyword">match</span> val:
+    <span class="keyword">when</span> 1: <span class="keyword">say</span> <span class="string">"One"</span>.
+    <span class="keyword">else:</span> <span class="keyword">say</span> <span class="string">"Else"</span>.
+<span class="keyword">end.</span></code></pre>
+            </div>
+        </section>
+
+        <section id="lists" class="section">
+            <h2>Lists & Collections</h2>
+            <div class="code-block glass">
+                <pre><code>nums = a list of 1, 2, 3.
+<span class="keyword">add</span> 4 <span class="keyword">to</span> nums.
+<span class="keyword">remove</span> 2 <span class="keyword">from</span> nums.</code></pre>
+            </div>
+        </section>
+
+        <section id="maps" class="section">
+            <h2>Maps (Dictionaries)</h2>
+            <div class="code-block glass">
+                <pre><code>user = {<span class="string">"id"</span>: 1, <span class="string">"name"</span>: <span class="string">"Alice"</span>}.
+<span class="keyword">say</span> user.name.</code></pre>
+            </div>
+        </section>
+
+        <section id="functions" class="section">
+            <h2>Functions</h2>
+            <div class="code-block glass">
+                <pre><code><span class="keyword">define</span> add needing a, b:
+    <span class="keyword">give</span> a + b.
+<span class="keyword">end.</span>
+
+res = the <span class="keyword">result of running</span> add <span class="keyword">with</span> 1, 2.</code></pre>
+            </div>
+        </section>
+
+        <section id="generators" class="section">
+            <h2>Generators</h2>
+            <div class="code-block glass">
+                <pre><code><span class="keyword">define</span> counter:
+    <span class="keyword">yield</span> 1.
+    <span class="keyword">yield</span> 2.
+<span class="keyword">end.</span></code></pre>
+            </div>
+        </section>
+
+        <section id="classes" class="section">
+            <h2>Classes & Objects</h2>
+            <div class="code-block glass">
+                <pre><code><span class="keyword">class</span> Pet:
+    <span class="keyword">define</span> bark: <span class="keyword">say</span> <span class="string">"Woof"</span>. <span class="keyword">end.</span>
+<span class="keyword">end.</span>
+
+dog = <span class="keyword">new</span> Pet.
+<span class="keyword">run</span> dog.bark.</code></pre>
+            </div>
+        </section>
+
+        <section id="pointers" class="section">
+            <h2>Pointers & Refs</h2>
+            <div class="code-block glass">
+                <pre><code>x = 10.
+ptr = &x.
+<span class="keyword">deref</span> ptr = 20.</code></pre>
+            </div>
+        </section>
+
+        <section id="async" class="section">
+            <h2>Async / Await</h2>
+            <div class="code-block glass">
+                <pre><code><span class="keyword">async define</span> job: <span class="keyword">say</span> <span class="string">"Doing"</span>. <span class="keyword">end.</span>
+task = <span class="keyword">async run</span> job.
+<span class="keyword">await</span> res = task.</code></pre>
+            </div>
+        </section>
+
+        <section id="errors" class="section">
+            <h2>Error Handling</h2>
+            <div class="code-block glass">
+                <pre><code><span class="keyword">try</span>:
+    <span class="keyword">raise</span> <span class="string">"Error!"</span>.
+<span class="keyword">on error saving to</span> e:
+    <span class="keyword">say</span> e.
+<span class="keyword">end.</span></code></pre>
+            </div>
+        </section>
+
+        <section id="native-ops" class="section">
+            <h2>Native Operations</h2>
+            <div class="code-block glass">
+                <pre><code><span class="keyword">save</span> <span class="string">"x"</span> <span class="keyword">to file called</span> <span class="string">"f.txt"</span>.
+<span class="keyword">fetch</span> <span class="string">"url"</span> <span class="keyword">into</span> d.</code></pre>
+            </div>
+        </section>
+
+        <section id="decorators" class="section">
+            <h2>Decorators</h2>
+            <pre><code><span class="keyword">@log</span>
+<span class="keyword">define</span> fn: ... <span class="keyword">end.</span></code></pre>
+        </section>
+
+        <section id="modules" class="section">
+            <h2>Modules & Imports</h2>
+            <pre><code><span class="keyword">import from file called</span> <span class="string">"lib.vrb"</span> <span class="keyword">as</span> L.</code></pre>
+        </section>
+
+        <section id="stdlib-strings" class="section">
+            <h2>Standard Library: Strings</h2>
+            <div class="code-block glass">
+                <pre><code>len = the <span class="keyword">result of running</span> strings.length <span class="keyword">with</span> <span class="string">"txt"</span>.</code></pre>
+            </div>
+        </section>
+
+        <section id="stdlib-math" class="section">
+            <h2>Standard Library: Math</h2>
+            <div class="code-block glass">
+                <pre><code>v = the <span class="keyword">result of running</span> math.sqrt <span class="keyword">with</span> 16.</code></pre>
+            </div>
+        </section>
+
+        <section id="stdlib-json" class="section">
+            <h2>Standard Library: JSON</h2>
+            <div class="code-block glass">
+                <pre><code>o = the <span class="keyword">result of running</span> json.parse <span class="keyword">with</span> <span class="string">'{"k":1}'</span>.</code></pre>
+            </div>
+        </section>
+
+        <section id="stdlib-crypto" class="section">
+            <h2>Standard Library: Crypto</h2>
+            <pre><code>h = the <span class="keyword">result of running</span> crypto.hash <span class="keyword">with</span> <span class="string">"pw"</span>.</code></pre>
+        </section>
+
+        <section id="stdlib-http" class="section">
+            <h2>HTTP Client</h2>
+            <pre><code>res = the <span class="keyword">result of running</span> http.get <span class="keyword">with</span> <span class="string">"url"</span>.</code></pre>
+        </section>
+
+        <section id="stdlib-server" class="section">
+            <h2>HTTP Server</h2>
+            <pre><code><span class="keyword">on route</span> <span class="string">"/"</span> <span class="keyword">with method</span> <span class="string">"GET"</span>:
+    <span class="keyword">respond with</span> <span class="string">"OK"</span> <span class="keyword">status</span> 200.
+<span class="keyword">end.</span>
+<span class="keyword">serve on port</span> 80.</code></pre>
+        </section>
+
+        <section id="stdlib-express" class="section">
+            <h2>Express Router</h2>
+            <pre><code><span class="keyword">run</span> express.get <span class="keyword">with</span> <span class="string">"/"</span>, <span class="string">"handle"</span>.</code></pre>
+        </section>
+
+        <section id="stdlib-db" class="section">
+            <h2>Databases</h2>
+            <pre><code>c = the <span class="keyword">result of running</span> db.open <span class="keyword">with</span> <span class="string">"db.sqlite"</span>.</code></pre>
+        </section>
+
+        <section id="stdlib-browser" class="section">
+            <h2>Web Scraping</h2>
+            <pre><code><span class="keyword">run</span> browser.open <span class="keyword">with</span> <span class="string">"url"</span>.</code></pre>
+        </section>
+
+        <section id="stdlib-os" class="section">
+            <h2>OS & Filesystem</h2>
+            <pre><code>files = the <span class="keyword">result of running</span> os.list <span class="keyword">with</span> <span class="string">"."</span>.</code></pre>
+        </section>
+
+        <section id="stdlib-time" class="section">
+            <h2>Time & Date</h2>
+            <pre><code>now = time.now.</code></pre>
+        </section>
+
+        <section id="stdlib-regex" class="section">
+            <h2>Regex & Base64</h2>
+            <pre><code>m = the <span class="keyword">result of running</span> regex.match <span class="keyword">with</span> <span class="string">"\d"</span>, <span class="string">"1"</span>.</code></pre>
+        </section>
+
+        <section id="stdlib-gui" class="section">
+            <h2>Desktop GUI</h2>
+            <pre><code>w = the <span class="keyword">result of running</span> gui.window <span class="keyword">with</span> <span class="string">"App"</span>.</code></pre>
+        </section>
+
+        <section id="testing" class="section">
+            <h2>Testing & Assert</h2>
+            <pre><code><span class="keyword">test</span> <span class="string">"t"</span>: <span class="keyword">assert</span> 1 == 1. <span class="keyword">end.</span></code></pre>
+        </section>
+
+        <footer>
+            <p>&copy; 2026 Verba Project. Documentation provided by Antigravity AI.</p>
+        </footer>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
