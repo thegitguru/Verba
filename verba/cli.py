@@ -68,8 +68,8 @@ def repl() -> int:
 def install_pkg(url: str) -> int:
     import urllib.request
     from urllib.parse import urlparse
-    
-    # name from URL: if no .vrb, append it.
+    from .pkg_registry import record_install, MODULES_DIR
+
     parsed = urlparse(url)
     name = Path(parsed.path).name
     if not name:
@@ -77,20 +77,103 @@ def install_pkg(url: str) -> int:
         return 1
     if not name.endswith(".vrb"):
         name += ".vrb"
-        
+
     print(f"Installing {name} from {url}...")
     try:
         with urllib.request.urlopen(url) as response:
             content = response.read()
-        
-        modules_dir = Path("modules")
-        modules_dir.mkdir(exist_ok=True)
-        (modules_dir / name).write_bytes(content)
-        print(f"Successfully installed package to {modules_dir / name}")
+        MODULES_DIR.mkdir(exist_ok=True)
+        (MODULES_DIR / name).write_bytes(content)
+        record_install(name, url)
+        print(f"Verbix: installed {name} -> {MODULES_DIR / name}")
         return 0
     except Exception as e:
-        print(f"I failed to install the package: {e}")
+        print(f"Verbix: failed to install package: {e}")
         return 1
+
+
+def uninstall_pkg(name: str) -> int:
+    from .pkg_registry import record_uninstall, MODULES_DIR
+
+    if not name.endswith(".vrb"):
+        name += ".vrb"
+    path = MODULES_DIR / name
+    removed_file = False
+    if path.exists():
+        path.unlink()
+        removed_file = True
+    removed_reg = record_uninstall(name)
+    if removed_file or removed_reg:
+        print(f"Verbix: uninstalled {name}")
+        return 0
+    print(f"Verbix: package '{name}' is not installed.")
+    return 1
+
+
+def list_pkgs() -> int:
+    from .pkg_registry import list_packages
+
+    pkgs = list_packages()
+    if not pkgs:
+        print("Verbix: no packages installed.")
+        return 0
+    print(f"{'Package':<30} {'Version':<12} URL")
+    print("-" * 70)
+    for pkg_name, info in pkgs.items():
+        print(f"{pkg_name:<30} {info['version']:<12} {info['url']}")
+    return 0
+
+
+def pkg_info(name: str) -> int:
+    from .pkg_registry import get_package, MODULES_DIR
+
+    if not name.endswith(".vrb"):
+        name += ".vrb"
+    pkg = get_package(name)
+    if pkg is None:
+        print(f"Verbix: package '{name}' is not installed.")
+        return 1
+    path = MODULES_DIR / name
+    print(f"Name:    {name}")
+    print(f"Version: {pkg['version']}")
+    print(f"URL:     {pkg['url']}")
+    print(f"Path:    {path} ({'exists' if path.exists() else 'missing'})")
+    return 0
+
+
+def _verbix_main(args: list[str]) -> int:
+    """Handles: verba verbix <install|uninstall|packages|info> [arg]"""
+    usage = (
+        "Verbix — Verba Package Manager\n"
+        "  verba verbix install <url>      Install a package\n"
+        "  verba verbix uninstall <name>   Uninstall a package\n"
+        "  verba verbix packages           List installed packages\n"
+        "  verba verbix info <name>        Show package info\n"
+    )
+    if not args:
+        print(usage)
+        return 0
+    cmd, *rest = args
+    if cmd == "install":
+        if not rest:
+            print("Verbix: provide a URL.  verba verbix install <url>")
+            return 1
+        return install_pkg(rest[0])
+    if cmd == "uninstall":
+        if not rest:
+            print("Verbix: provide a package name.  verba verbix uninstall <name>")
+            return 1
+        return uninstall_pkg(rest[0])
+    if cmd == "packages":
+        return list_pkgs()
+    if cmd == "info":
+        if not rest:
+            print("Verbix: provide a package name.  verba verbix info <name>")
+            return 1
+        return pkg_info(rest[0])
+    print(f"Verbix: unknown command '{cmd}'.\n")
+    print(usage)
+    return 1
 
 
 def format_file(path: Path) -> int:
@@ -125,65 +208,71 @@ def format_file(path: Path) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="verba", description="Run Verba (natural English) programs.")
-    sub = p.add_subparsers(dest="command")
-    
-    # run (default)
-    run_p = sub.add_parser("run", help="Run a Verba script.")
-    run_p.add_argument("file", help="The .vrb file to run.")
-    
-    # check
-    check_p = sub.add_parser("check", help="Parse script without running.")
-    check_p.add_argument("file")
-    
-    # repl
-    sub.add_parser("repl", help="Start interactive shell.")
-    
-    # install
-    inst_p = sub.add_parser("install", help="Install a package from a URL.")
-    inst_p.add_argument("url", help="URL of the .vrb file.")
+    raw = argv if argv is not None else sys.argv[1:]
 
-    # format
+    # Legacy flag handling (before argparse sees subcommands)
+    if not raw:
+        return repl()
+    if raw == ["--version"]:
+        print("verba 0.1.0")
+        return 0
+    if raw == ["--repl"]:
+        return repl()
+    if len(raw) == 2 and raw[0] == "--check":
+        try:
+            return check_file(Path(raw[1]))
+        except (VerbaParseError, VerbaRuntimeError) as e:
+            print(e, file=sys.stderr)
+            return 1
+    if len(raw) == 1 and raw[0].endswith(".vrb"):
+        try:
+            return run_file(Path(raw[0]))
+        except (VerbaParseError, VerbaRuntimeError) as e:
+            print(e, file=sys.stderr)
+            return 1
+
+    # "verba verbix <cmd> [args]" — Verbix package manager namespace
+    if raw and raw[0] == "verbix":
+        return _verbix_main(raw[1:])
+
+    p = argparse.ArgumentParser(prog="verba", description="Run Verba programs.")
+    sub = p.add_subparsers(dest="command")
+
+    run_p = sub.add_parser("run", help="Run a Verba script.")
+    run_p.add_argument("file")
+
+    check_p = sub.add_parser("check", help="Parse without running.")
+    check_p.add_argument("file")
+
+    sub.add_parser("repl", help="Start interactive shell.")
+
+    inst_p = sub.add_parser("install", help="Install a package from a URL.")
+    inst_p.add_argument("url")
+
+    uninst_p = sub.add_parser("uninstall", help="Uninstall a package by name.")
+    uninst_p.add_argument("name")
+
+    sub.add_parser("packages", help="List installed packages.")
+
+    info_p = sub.add_parser("pkg-info", help="Show info about an installed package.")
+    info_p.add_argument("name")
+
     fmt_p = sub.add_parser("format", help="Format a Verba script.")
     fmt_p.add_argument("file")
 
-    # original/legacy args (for backward compatibility if possible)
-    p.add_argument("legacy_file", nargs="?", help="Legacy file argument.")
-    p.add_argument("--repl",    action="store_true", help="Start an interactive REPL.")
-    p.add_argument("--version", action="store_true", help="Print version and exit.")
-    p.add_argument("--check",   action="store_true", help="Parse only — do not run.")
-
-    ns = p.parse_args(argv)
-
-    if ns.version:
-        print("verba 0.1.0")
-        return 0
+    ns = p.parse_args(raw)
 
     try:
-        # Check subcommands
-        if ns.command == "install":
-            return install_pkg(ns.url)
-        if ns.command == "format":
-            return format_file(Path(ns.file))
-        if ns.command == "check":
-            return check_file(Path(ns.file))
-        if ns.command == "repl":
-            return repl()
-        if ns.command == "run":
-            return run_file(Path(ns.file))
-            
-        # legacy handling
-        if ns.repl or (ns.command is None and ns.legacy_file is None):
-            return repl()
-        if ns.check:
-             return check_file(Path(ns.legacy_file))
-        if ns.legacy_file:
-             return run_file(Path(ns.legacy_file))
-        
+        if ns.command == "run":       return run_file(Path(ns.file))
+        if ns.command == "check":     return check_file(Path(ns.file))
+        if ns.command == "repl":      return repl()
+        if ns.command == "install":   return install_pkg(ns.url)
+        if ns.command == "uninstall": return uninstall_pkg(ns.name)
+        if ns.command == "packages":  return list_pkgs()
+        if ns.command == "pkg-info":  return pkg_info(ns.name)
+        if ns.command == "format":    return format_file(Path(ns.file))
         return repl()
     except (VerbaParseError, VerbaRuntimeError) as e:
-        import traceback
-        traceback.print_exc()
         print(e, file=sys.stderr)
         return 1
     except VerbaError as e:

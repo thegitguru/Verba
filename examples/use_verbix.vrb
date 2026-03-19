@@ -1,0 +1,45 @@
+note use_verbix.vrb — fetch data using the verbix_utils module
+note Run: verba examples/use_verbix.vrb
+
+import from file called "modules/verbix_utils.vrb".
+
+note ── 1. Simple GET ──────────────────────────────────────────────
+res = the result of running http.get with "https://httpbin.org/get".
+
+ok = the result of running is_success with res.status.
+say "GET ok: ", ok.
+
+short_body = the result of running truncate with res.body, 80.
+run format_response with "GET /get", res.status, short_body.
+
+note ── 2. POST JSON ─────────────────────────────────────────────
+res2 = the result of running http.post_json with "https://httpbin.org/post", '{"lang":"verba","pkg":"verbix"}'.
+
+ok2 = the result of running is_success with res2.status.
+say "POST ok: ", ok2.
+
+short2 = the result of running truncate with res2.body, 80.
+run format_response with "POST /post", res2.status, short2.
+
+note ── 3. GET with query params ──────────────────────────────────
+url = the result of running http.encode_url with "https://httpbin.org/get", '{"q":"verbix","page":"1"}'.
+res3 = the result of running http.get with url.
+
+short3 = the result of running truncate with res3.body, 80.
+run format_response with "GET with params", res3.status, short3.
+
+note ── 4. Auth header demo ───────────────────────────────────────
+auth = the result of running build_auth_header with "my_secret_token".
+say "Auth header value: ", auth.
+say.
+
+note ── 5. Error handling ────────────────────────────────────────
+try:
+    bad = the result of running http.get with "https://httpbin.org/status/404".
+    ok3 = the result of running is_success with bad.status.
+    run format_response with "404 response", bad.status, ok3.
+on error saving to err:
+    say "caught error: ", err.
+end.
+
+say "done.".

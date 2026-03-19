@@ -1,0 +1,40 @@
+note use_mathkit.vrb — demo using the mathkit package installed via Verbix
+note Step 1: verba verbix install http://localhost:8900/mathkit.vrb
+note Step 2: verba examples/use_mathkit.vrb
+
+import from file called "modules/mathkit.vrb".
+
+note basic operations
+a = 12.
+b = 4.
+
+sum = the result of running add with a, b.
+say "add      : ", a, " + ", b, " = ", sum.
+
+diff = the result of running subtract with a, b.
+say "subtract : ", a, " - ", b, " = ", diff.
+
+prod = the result of running multiply with a, b.
+say "multiply : ", a, " * ", b, " = ", prod.
+
+quot = the result of running divide with a, b.
+say "divide   : ", a, " / ", b, " = ", quot.
+
+pw = the result of running power with 2, 10.
+say "power    : 2 ^ 10 = ", pw.
+
+note clamp
+clamped = the result of running clamp with 150, 0, 100.
+say "clamp 150 to [0,100] = ", clamped.
+
+note average
+scores = a list of 80, 95, 70, 88, 92.
+avg = the result of running average with scores.
+say "average of scores = ", avg.
+
+note divide by zero is caught
+try:
+    bad = the result of running divide with 10, 0.
+on error saving to err:
+    say "caught: ", err.
+end.

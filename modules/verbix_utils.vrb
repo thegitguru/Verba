@@ -1,0 +1,32 @@
+note verbix_utils.vrb — example Verbix module
+note Install: verba install https://raw.githubusercontent.com/.../verbix_utils.vrb
+note Or use directly: import from file called "modules/verbix_utils.vrb".
+
+define format_response needing label, status, body:
+    say "--- ", label, " ---".
+    say "status : ", status.
+    say "body   : ", body.
+    say.
+end.
+
+define is_success needing status:
+    code = the result of running strings.to_number with status.
+    if code >= 200 and code < 300:
+        give "true".
+    end.
+    give "false".
+end.
+
+define build_auth_header needing token:
+    give join "Bearer ", token.
+end.
+
+define truncate needing text, limit:
+    length = the result of running strings.length with text.
+    if length <= limit:
+        give text.
+    end.
+    give the result of running strings.slice with text, 0, limit.
+end.
+
+say "verbix_utils loaded.".

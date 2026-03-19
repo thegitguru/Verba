@@ -1,0 +1,51 @@
+note mathkit.vrb — Verbix package: math utilities
+note Version: 1.0.0
+note Fetch via: verba verbix install http://localhost:8900/mathkit.vrb
+
+define add needing a, b:
+    give a + b.
+end.
+
+define subtract needing a, b:
+    give a - b.
+end.
+
+define multiply needing a, b:
+    give a * b.
+end.
+
+define divide needing a, b:
+    if b == 0:
+        raise "Cannot divide by zero.".
+    end.
+    give a / b.
+end.
+
+define power needing base, exp:
+    give base ** exp.
+end.
+
+define clamp needing value, low, high:
+    if value < low:
+        give low.
+    end.
+    if value > high:
+        give high.
+    end.
+    give value.
+end.
+
+define average needing numbers:
+    total = 0.
+    count = 0.
+    for n in numbers:
+        total += n.
+        count += 1.
+    end.
+    if count == 0:
+        give 0.
+    end.
+    give total / count.
+end.
+
+say "mathkit 1.0.0 loaded.".

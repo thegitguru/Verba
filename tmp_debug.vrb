@@ -1,0 +1,7 @@
+res = the result of running http.get with "https://httpbin.org/get".
+say "status: ", res.status.
+say "ok: ", res.ok.
+
+res2 = the result of running http.post_json with "https://httpbin.org/post", '{"hello":"world"}'.
+say "post status: ", res2.status.
+say "post ok: ", res2.ok.
