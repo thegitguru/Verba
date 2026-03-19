@@ -238,8 +238,6 @@ for i from 10 to 0 step -2:
     say i.
 end.
 ```
-```
-
 **Loop control:**
 ```vb
 stop.   /- break out of the loop
@@ -256,7 +254,7 @@ add yellow to colors.
 remove green from colors.
 ```
 
-1-based indexing:
+**1-based indexing:**
 ```vb
 first_color = item 1 of colors.
 ```
