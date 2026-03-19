@@ -124,6 +124,8 @@ def format_file(path: Path) -> int:
         return 1
 
 
+VERSION = "1.0.0"
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="verba", description="Run Verba (natural English) programs.")
     sub = p.add_subparsers(dest="command")
@@ -150,13 +152,13 @@ def main(argv: list[str] | None = None) -> int:
     # original/legacy args (for backward compatibility if possible)
     p.add_argument("legacy_file", nargs="?", help="Legacy file argument.")
     p.add_argument("--repl",    action="store_true", help="Start an interactive REPL.")
-    p.add_argument("--version", action="store_true", help="Print version and exit.")
+    p.add_argument("-v", "--version", action="store_true", help="Print version and exit.")
     p.add_argument("--check",   action="store_true", help="Parse only — do not run.")
 
     ns = p.parse_args(argv)
 
     if ns.version:
-        print("verba 0.1.0")
+        print(f"verba {VERSION}")
         return 0
 
     try:
