@@ -3,10 +3,10 @@
 **Verba** is an interpreted, English-like programming language designed to be readable by anyone, even without a programming background. Code reads like instructions you'd give a person. Every statement ends with a period `.` (or a colon `:` for blocks).
 
 ```verba
-note A simple greeting program.
+/- A simple greeting program.
 
 ask the user "What is your name?" and save to name.
-say "Hello, ", name, "!".
+say "Hello, {name}!".
 
 score = 10.
 score = score + 5 * 2.
@@ -53,12 +53,30 @@ verba run yourfile.vrb
 
 ```verba
 /- This is a single-line comment.
+# This is also a single-line comment.
 
 /--
   This is a block comment.
   It can span multiple lines.
 --/
 ```
+
+### Notes (Inline Docs / Docstrings)
+
+`note` is a special statement that works as a human-readable inline comment or docstring. It does not require a period terminator and is evaluated at parse-time only (not executed).
+
+```verba
+note This function computes the square of a number.
+
+define square needing n:
+    note Returns n multiplied by itself.
+    give n * n.
+end.
+```
+
+The first `note` inside a `define` or `class` block becomes the official **docstring** shown by `help`.
+
+---
 
 ### Variables & Assignment
 
@@ -70,6 +88,7 @@ score = 10 + 5 * 2.     /- supports +, -, *, /, %, **
 quotient = 10 / 3.
 modulo = 10 % 3.
 power = 2 ** 8.
+floor_div = 10 // 3.    /- integer (floor) division
 ```
 
 ### String Interpolation
@@ -79,15 +98,18 @@ Double-quoted strings support `{variable}` interpolation. Single-quoted strings 
 ```verba
 user = "Alice".
 greeting = "Hello, {user}!".     /- → "Hello, Alice!"
+obj_prop = "City: {address.city}".  /- nested property access in string
 raw = 'No {interpolation} here'.
 joined = join "Hello, ", user, "!".   /- explicit concatenation
 ```
+
+To write a literal brace inside an interpolated string, double it: `{{` or `}}`.
 
 ### Output
 
 ```verba
 say "Hello, world!".                   /- prints with newline
-display "no newline ".                 /- prints without newline
+display "no newline ".                 /- prints without newline (alias: print)
 say "a", " ", "b", " ", "c".          /- prints multiple values on one line
 say.                                   /- prints a blank line
 ```
@@ -109,6 +131,11 @@ x *= 3.
 x /= 2.
 ```
 
+Compound assignment also works on object properties:
+```verba
+player.score += 10.
+```
+
 ### Conditions
 
 ```verba
@@ -121,7 +148,9 @@ else:
 end.
 ```
 
-**Comparison operators:** `==`, `!=`, `<`, `>`, `<=`, `>=`, `is null`, `is not null`
+**Comparison operators:** `==`, `!=`, `<`, `>`, `<=`, `>=`, `is null`, `is not null`, `in`, `not in`
+
+**Aliases:** `is` → `==`, `is not` → `!=`, `is greater than` → `>`, `is less than` → `<`, `is at least` → `>=`, `is at most` → `<=`, `does not equal` → `!=`
 
 **Logical operators:** `and`, `or`, `not`
 
@@ -150,9 +179,9 @@ for color in colors:
     say color.
 end.
 
-/- for each with index
-for item, idx in colors:
-    say idx, ": ", item.
+/- for each with index (1-based)
+for item at index in colors:
+    say index, ": ", item.
 end.
 
 /- numeric range
@@ -194,7 +223,7 @@ sort nums descending.
 first 3 of nums into top3.
 last 2 of nums into bottom2.
 
-/- list literal
+/- list literal shorthand
 squares = [1, 4, 9, 16].
 
 /- list comprehension
@@ -220,6 +249,9 @@ user.email = "alice@example.com".
 config = a map of
     host: "localhost",
     port: 8080.
+
+/- map comprehension (key: value for k, v in source)
+counts = k: (length of v) for k, v in data.
 ```
 
 ---
@@ -251,6 +283,9 @@ low, high = the result of running min_max with 1, 100.
 define greet_with_title needing name, title = "Dr.":
     say title, " ", name.
 end.
+
+/- keyword arguments (named params)
+run greet_with_title with name = "Alice", title = "Prof.".
 
 /- recursive
 define factorial needing n:
@@ -324,12 +359,37 @@ match status:
         say "Other status".
 end.
 
+/- list pattern destructuring
+match point:
+    when [0, 0]:
+        say "Origin".
+    when [x, 0]:
+        say "On x-axis at ", x.
+end.
+
 /- map pattern destructuring
 match user:
     when {"role": "admin"}:
         say "Admin access".
     else:
         say "Regular user".
+end.
+```
+
+---
+
+## 🏷️ Enums
+
+```verba
+enum Color:
+    Red, Green, Blue.
+end.
+
+current = color.red.
+say current.            /- → "color.red"
+
+if current == color.red:
+    say "It's red!".
 end.
 ```
 
@@ -372,7 +432,6 @@ Built-in decorators:
 |---|---|
 | `@log` | Logs function name, args, and kwargs on every call |
 | `@time` | Prints execution time after each call |
-| `@memoize` | Caches results by arguments (avoids re-running) |
 
 ```verba
 @log
@@ -394,9 +453,47 @@ import from file called "my_module.vrb" as mh.
 
 /- call imported functions
 result = the result of running mh.multiply_things with 3, 4.
+
+/- access imported variables
+say mh.version.
 ```
 
 Modules are placed in the `modules/` folder and loaded by name.
+
+---
+
+## 🪟 With Statement (Scoped Binding)
+
+The `with` statement binds an expression to a variable for the duration of its block. If the bound value has a `close` method it is called automatically on exit.
+
+```verba
+with the result of running db.open with "data.sqlite" as conn:
+    run conn.execute with "SELECT 1".
+end.
+/- conn.close is called automatically here
+```
+
+---
+
+## 🔍 Help System
+
+```verba
+help.                   /- lists all available modules
+help strings.           /- shows all functions in the strings module
+help strings.upper.     /- shows parameters for strings.upper
+help myFunction.        /- shows docstring and usage for your function
+help MyClass.           /- shows methods for a class
+```
+
+---
+
+## 🗑️ Freeing Variables
+
+```verba
+temp = "I am temporary".
+free temp.          /- removes temp from the current scope
+delete temp.        /- alias for free
+```
 
 ---
 
@@ -409,6 +506,13 @@ on error saving to err:
     say "Caught: ", err.
 finally:
     say "cleanup done".
+end.
+
+/- on error without capturing the error message
+try:
+    raise "Something went wrong.".
+on error:
+    say "An error occurred.".
 end.
 
 /- raise an error explicitly
@@ -496,7 +600,7 @@ define handle_home:
 end.
 
 run express.get with "/", "handle_home".
-run express.get with "/users/:id", "handle_user".
+run express.get with "/users/:id", "handle_user".   /- :id captured as request.param_id
 run express.post with "/echo", "handle_echo".
 
 run express.listen with "5000".
@@ -512,9 +616,8 @@ test "math works":
     assert a == 20.
 end.
 
-test "strings":
-    s = "Hello, {name}!".
-    assert s != "".
+test "with message":
+    assert 1 == 1 saying "one should equal one".
 end.
 ```
 
@@ -541,8 +644,8 @@ All modules are available by default — no imports needed.
 | `strings.ends_with` with `s, suffix` | Suffix check |
 | `strings.replace` with `s, old, new` | Replace all occurrences |
 | `strings.split` with `s, sep` | Split into a list |
-| `strings.index_of` with `s, sub` | First index of substring |
-| `strings.slice` with `s, start, end` | Substring |
+| `strings.index_of` with `s, sub` | First index of substring (-1 if not found) |
+| `strings.slice` with `s, start, end` | Substring by index |
 | `strings.to_number` with `s` | Parse to number |
 | `strings.repeat` with `s, times` | Repeat string N times |
 
@@ -555,11 +658,11 @@ All modules are available by default — no imports needed.
 | `math.abs` with `n` | Absolute value |
 | `math.sqrt` with `n` | Square root |
 | `math.power` with `base, exp` | Exponentiation |
-| `math.log` with `n, base` | Logarithm |
-| `math.sin / cos / tan` with `n` | Trig functions |
+| `math.log` with `n, base` | Logarithm (natural if base omitted) |
+| `math.sin / cos / tan` with `n` | Trig functions (radians) |
 | `math.random` | Random float 0..1 |
-| `math.random_int` with `low, high` | Random integer |
-| `math.min / max` with `a, b` | Min/Max |
+| `math.random_int` with `low, high` | Random integer in range |
+| `math.min / max` with `a, b` | Min/Max of two values |
 | `math.pi` | π constant |
 
 ### `db` — SQLite Database
@@ -576,13 +679,13 @@ run conn.close.
 | Function | Description |
 |---|---|
 | `crypto.hash` with `text, alg` | Hash text (SHA-256 by default) |
-| `crypto.generate_token` with `n` | Secure random hex token |
+| `crypto.generate_token` with `n` | Secure random hex token of `n` bytes |
 | `crypto.encrypt` with `text, key` | XOR + Base64 encryption |
 | `crypto.decrypt` with `text, key` | Decrypt XOR + Base64 |
 
 ```verba
-hash = the result of running crypto.hash with "my secret".
-token = the result of running crypto.generate_token with 32.
+hash = the result of running crypto.hash with text = "my secret".
+token = the result of running crypto.generate_token with n = 32.
 ```
 
 ### `json` — JSON Parsing & Building
@@ -591,18 +694,18 @@ token = the result of running crypto.generate_token with 32.
 | `json.parse` with `s` | Parse JSON string → dict/list |
 | `json.get` with `obj, key` | Get key from object or JSON string |
 | `json.set` with `json, key, value` | Return updated JSON string |
-| `json.build` with `k1, v1, ...` | Build JSON from key-value pairs |
+| `json.build` with `k1, v1, ...` | Build JSON from key-value pairs (up to 6 pairs) |
 | `json.stringify` with `value` | Wrap value as JSON string |
-| `json.has` with `json, key` | Check if key exists |
-| `json.keys` with `json` | List all keys |
+| `json.has` with `json, key` | Returns `"true"` / `"false"` |
+| `json.keys` with `json` | Returns a list of all keys |
 | `json.arr_len` with `json` | Length of JSON array |
-| `json.arr_item` with `json, index` | Get item at index |
+| `json.arr_item` with `json, index` | Get item at index from JSON array |
 
 ### `csv` — CSV Files
 ```verba
 rows = the result of running csv.read with "data.csv".
 for row in rows:
-    say row.name.
+    say row.name.          /- each row is accessible as an object
 end.
 
 run csv.write with "out.csv", rows.
@@ -611,9 +714,9 @@ run csv.write with "out.csv", rows.
 ### `xml` — XML Parsing
 ```verba
 parsed = the result of running xml.parse with "<root><item>hello</item></root>".
-say parsed.tag.
+say parsed.tag.             /- → "root"
 found = the result of running xml.find with parsed, "item".
-say found.text.
+say found.text.             /- → "hello"
 ```
 
 ### `http` — HTTP Client
@@ -623,9 +726,13 @@ say found.text.
 | Function | Description |
 |---|---|
 | `browser.open` with `url` | Fetch URL, store page |
+| `browser.goto` with `url` | Alias for open |
 | `browser.read` with `selector` | Read text from CSS tag (e.g. `"h1"`) |
+| `browser.read_html` with `selector` | Read raw inner HTML |
 | `browser.title` | Get page title |
 | `browser.url` | Get current URL |
+| `browser.wait` with `ms` | Sleep for N milliseconds |
+| `browser.wait_for` with `selector` | Assert element exists |
 | `browser.close` | Reset browser state |
 
 ```verba
@@ -651,31 +758,31 @@ say heading.
 ### `time` — Date & Time
 | Function | Description |
 |---|---|
-| `time.now` | Unix timestamp |
+| `time.now` | Unix timestamp (seconds) |
 | `time.sleep` with `ms` | Sleep for milliseconds |
-| `time.format` with `timestamp, fmt` | Format timestamp |
+| `time.format` with `timestamp, fmt` | Format timestamp (strftime format) |
 | `time.year / month / day` | Current date parts |
 | `time.hour / minute / second` | Current time parts |
-| `time.since` with `timestamp` | Elapsed seconds |
+| `time.since` with `timestamp` | Elapsed seconds since timestamp |
 
 ### `datetime` — Datetime Objects
 | Function | Description |
 |---|---|
 | `datetime.now` with `format` | Current datetime, optional format string |
 | `datetime.parse` with `text, layout` | Parse datetime string |
-| `datetime.format` with `iso_str, layout` | Format ISO datetime |
+| `datetime.format` with `iso_str, layout` | Format ISO datetime string |
 
 ### `random` — Randomness
 | Function | Description |
 |---|---|
-| `random.number` with `min, max` | Random integer |
+| `random.number` with `min, max` | Random integer in range |
 | `random.choice` with `list` | Random element from list |
-| `random.shuffle` with `list` | Shuffled list |
+| `random.shuffle` with `list` | Shuffled copy of list |
 
 ### `regex` — Regular Expressions
 | Function | Description |
 |---|---|
-| `regex.match` with `pattern, text` | True if pattern matches start |
+| `regex.match` with `pattern, text` | True if pattern matches start of text |
 | `regex.search` with `pattern, text` | True if pattern found anywhere |
 | `regex.replace` with `pattern, replacement, text` | Regex replace |
 
@@ -688,17 +795,33 @@ say heading.
 ### `env` — Environment Variables
 | Function | Description |
 |---|---|
-| `env.get` with `key, default` | Read env var |
+| `env.get` with `key, default` | Read env var (returns default if not set) |
 | `env.set` with `key, value` | Set env var |
-| `env.has` with `key` | Check if set |
-| `env.all` | List all as `key=value` strings |
+| `env.has` with `key` | Returns `"true"` / `"false"` |
+| `env.all` | Returns list of all `key=value` strings |
+
+### `vibe` — WebSockets
+```verba
+conn = the result of running vibe.open with "ws://localhost:8080".
+run conn.send with "Hello, server!".
+msg = the result of running conn.receive.
+say msg.
+run conn.close.
+```
 
 ### `gui` — Desktop UI (Tkinter)
 ```verba
 win = the result of running gui.window with "My App".
 run win.label with "Hello, Verba!".
 run win.button with "Click me", "on_click".
+inp = the result of running win.input with "Your name".
 run win.show.
+
+/- inside a callback:
+define on_click:
+    name = the result of running win.get with "Your name".
+    say "Hello, ", name.
+end.
 ```
 
 ---
@@ -732,6 +855,7 @@ verba/
     ├── csv.py       — CSV read/write
     ├── xml.py       — XML parsing
     ├── gui.py       — Desktop GUI (Tkinter wrapper)
+    ├── vibe.py      — WebSocket client
     └── express.py   — Express-style HTTP router
 ```
 
@@ -775,9 +899,6 @@ python -m verba run examples/webapp/server.vrb
 
 /- Full test suite
 python -m verba run test_suite.vrb
-
-/- Run all examples automatically
-python run_examples_test.py
 ```
 
 ---
@@ -810,10 +931,12 @@ Enforces 4-space block indentation and consistent style.
 - Every statement ends with `.` (period)
 - Block openers end with `:` (colon)
 - Blocks close with `end.`
-- Indentation is **4 spaces** per level (tabs = 4 spaces)
+- Indentation is **4 spaces** per level (tabs count as 4 spaces)
 - String interpolation uses `{variable}` inside double-quoted strings `"..."` only
 - Single-quoted strings `'...'` are raw literals (no interpolation)
-- Comments: `/-` for single-line, `/-- ... --/` for block
+- Comments: `/-` or `#` for single-line, `/-- ... --/` for block
+- Names are **single words** (no spaces); use underscores: `my_variable`
+- All keywords are **case-insensitive** when parsed
 
 ---
 
