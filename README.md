@@ -45,6 +45,7 @@ verba run yourfile.vrb
 | `verba format <file.vrb>` | Auto-format script with 4-space indentation |
 | `verba init <name>` | Initialize a new Verba project directory with scaffolding |
 | `verba list` | List currently installed local packages in `modules/` |
+| `verba search <query>`| Search for a package in the Verba registry by name. |
 | `verba install <pkg/url>`| Download & install a `.vrb` package from the registry or a direct URL into `modules/`. If no package is passed, downloads all `dependencies` given in `verba.json` |
 | `verba update <pkg>`| Update a package (or all packages) by verifying against the registry versions |
 | `verba remove <pkg>` | Remove an installed package from `modules/` and `verba.json` |
