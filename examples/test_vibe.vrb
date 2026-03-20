@@ -1,0 +1,23 @@
+say "Verba Vibe: WebSocket Example".
+say "------------------------------".
+
+# Connect to a public echo server
+socket = the result of running vibe.open with "ws://localhost:8765".
+
+if socket.error:
+    say "Connection Failed: ", socket.error.
+otherwise:
+    say "Connected successfully!".
+    
+    # Send a message
+    say "Sending: Hello from Verba!".
+    run socket.send with "Hello from Verba!".
+    
+    # Receive a response
+    reply = the result of running socket.receive.
+    say "Received: ", reply.
+    
+    # Close
+    socket.close.
+    say "Connection Closed.".
+end.

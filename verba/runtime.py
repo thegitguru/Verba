@@ -17,29 +17,31 @@ class Interpreter:
     def __init__(self):
         self.globals = Environment()
         self._http_routes: dict[tuple[str, str], tuple] = {}
+        self._http_response = None
         self._inject_stdlib()
 
     # ── stdlib injection ──────────────────────────────────────────────────────
 
     def _inject_stdlib(self) -> None:
-        from verba.stdlib import http as _http_mod
-        from verba.stdlib import browser as _browser_mod
-        from verba.stdlib import express as _express_mod
-        from verba.stdlib import strings as _strings_mod
-        from verba.stdlib import math as _math_mod
-        from verba.stdlib import json as _json_mod
-        from verba.stdlib import os as _os_mod
-        from verba.stdlib import time as _time_mod
-        from verba.stdlib import env as _env_mod
-        from verba.stdlib import random as _random_mod
-        from verba.stdlib import base64 as _base64_mod
-        from verba.stdlib import regex as _regex_mod
-        from verba.stdlib import datetime as _datetime_mod
-        from verba.stdlib import db as _db_mod
-        from verba.stdlib import crypto as _crypto_mod
-        from verba.stdlib import csv as _csv_mod
-        from verba.stdlib import xml as _xml_mod
-        from verba.stdlib import gui as _gui_mod
+        from .stdlib import http as _http_mod
+        from .stdlib import browser as _browser_mod
+        from .stdlib import express as _express_mod
+        from .stdlib import strings as _strings_mod
+        from .stdlib import math as _math_mod
+        from .stdlib import json as _json_mod
+        from .stdlib import os as _os_mod
+        from .stdlib import time as _time_mod
+        from .stdlib import env as _env_mod
+        from .stdlib import random as _random_mod
+        from .stdlib import base64 as _base64_mod
+        from .stdlib import regex as _regex_mod
+        from .stdlib import datetime as _datetime_mod
+        from .stdlib import db as _db_mod
+        from .stdlib import crypto as _crypto_mod
+        from .stdlib import csv as _csv_mod
+        from .stdlib import vibe as _vibe_mod
+        from .stdlib import xml as _xml_mod
+        from .stdlib import gui as _gui_mod
         for mod_name, mod in [
             ("http",    _http_mod),
             ("browser", _browser_mod),
@@ -59,6 +61,7 @@ class Interpreter:
             ("csv",     _csv_mod),
             ("xml",     _xml_mod),
             ("gui",     _gui_mod),
+            ("vibe",    _vibe_mod),
         ]:
             needs_interp: set = getattr(mod, "NEEDS_INTERP", set())
             methods = {}
@@ -755,7 +758,7 @@ class Interpreter:
             interp = self
 
             class _VerbaHandler(http.server.BaseHTTPRequestHandler):
-                def log_message(self, *_): pass
+                def log_message(self, format: str, *args: Any) -> None: pass
 
                 def _dispatch(self, method: str):
                     import urllib.parse
@@ -806,7 +809,7 @@ class Interpreter:
                     data = body.encode("utf-8")
                     self.send_response(status)
                     self.send_header("Content-Type", mime)
-                    self.send_header("Content-Length", len(data))
+                    self.send_header("Content-Length", str(len(data)))
                     self.send_header("Access-Control-Allow-Origin", "*")
                     self.end_headers()
                     self.wfile.write(data)
