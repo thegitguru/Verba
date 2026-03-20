@@ -124,6 +124,27 @@ def format_file(path: Path) -> int:
         return 1
 
 
+def init_project(name: str) -> int:
+    try:
+        project_dir = Path(name)
+        if project_dir.exists():
+            print(f"Error: Directory '{name}' already exists.")
+            return 1
+            
+        project_dir.mkdir(parents=True)
+        (project_dir / "main.vrb").write_text("say \"Hello from Verba!\".\n", encoding="utf-8")
+        (project_dir / "verba.json").write_text(f'{{\n  "name": "{name}",\n  "version": "1.0.0"\n}}\n', encoding="utf-8")
+        (project_dir / "modules").mkdir()
+        (project_dir / "README.md").write_text(f"# {name}\n\nA Verba project.\n\nRun with:\n```bash\nverba run main.vrb\n```\n", encoding="utf-8")
+        
+        print(f"Created Verba project in ./{name}/")
+        print(f"cd {name} and run commands.")
+        return 0
+    except Exception as e:
+        print(f"Failed to initialize project: {e}")
+        return 1
+
+
 VERSION = "1.0.0"
 
 def main(argv: list[str] | None = None) -> int:
@@ -149,6 +170,10 @@ def main(argv: list[str] | None = None) -> int:
     fmt_p = sub.add_parser("format", help="Format a Verba script.")
     fmt_p.add_argument("file")
 
+    # init
+    init_p = sub.add_parser("init", help="Initialize a new Verba project.")
+    init_p.add_argument("name", help="Name of the project directory.")
+
     # original/legacy args (for backward compatibility if possible)
     p.add_argument("legacy_file", nargs="?", help="Legacy file argument.")
     p.add_argument("--repl",    action="store_true", help="Start an interactive REPL.")
@@ -171,6 +196,8 @@ def main(argv: list[str] | None = None) -> int:
             return check_file(Path(ns.file))
         if ns.command == "repl":
             return repl()
+        if ns.command == "init":
+            return init_project(ns.name)
         if ns.command == "run":
             return run_file(Path(ns.file))
             

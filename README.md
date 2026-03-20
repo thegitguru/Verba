@@ -43,6 +43,7 @@ verba run yourfile.vrb
 | `verba check <file.vrb>` | Parse only — syntax check without running |
 | `verba repl` | Start an interactive REPL |
 | `verba format <file.vrb>` | Auto-format script with 4-space indentation |
+| `verba init <name>` | Initialize a new Verba project directory with scaffolding |
 | `verba install <url>` | Download & install a `.vrb` package into `modules/` |
 
 ---
