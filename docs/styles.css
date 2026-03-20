@@ -36,6 +36,31 @@ body.dark-theme {
     height: 100vh;
     overflow-y: auto;
     z-index: 100;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-menu-btn {
+    display: none;
+    position: fixed;
+    top: 1.5rem;
+    right: 1.5rem;
+    z-index: 1000;
+    background: var(--accent);
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(142, 45, 226, 0.4);
+}
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 90;
 }
 
 .sidebar-header {
@@ -254,13 +279,17 @@ pre {
     padding: 1.5rem;
     overflow-x: auto;
     font-family: var(--font-mono);
-    font-size: 0.9rem;
-    line-height: 1.5;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    background: #1e222d;
+    border-radius: 0 0 12px 12px;
 }
 
-.keyword { color: #c678dd; }
+.keyword { color: #c678dd; font-weight: 600; }
 .string { color: #98c379; }
-.comment { color: #5c6370; font-style: italic; }
+.comment { color: #abb2bf; font-style: italic; opacity: 0.6; }
+.func { color: #61afef; }
+.builtin { color: #e5c07b; }
 
 /* Hero Stats */
 .hero-stats {
@@ -351,10 +380,12 @@ th {
 }
 
 td code {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 0.2rem 0.4rem;
-    border-radius: 4px;
+    background: rgba(142, 45, 226, 0.15);
+    color: #cba6f7;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
     font-family: var(--font-mono);
+    font-size: 0.85rem;
 }
 
 footer {
@@ -382,11 +413,50 @@ footer {
 }
 
 @media (max-width: 900px) {
-    .sidebar {
-        display: none;
+    .mobile-menu-btn {
+        display: block;
     }
+
+    .sidebar {
+        transform: translateX(-100%);
+        width: 80%;
+        max-width: 320px;
+    }
+
+    .sidebar.active {
+        transform: translateX(0);
+    }
+
+    .sidebar-overlay.active {
+        display: block;
+    }
+
     .content-area {
-        margin-left: 0;
-        padding: 2rem;
+        margin-left: 0 !important;
+        padding: 2rem 1.25rem;
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    .verba-text-logo {
+        font-size: clamp(2.5rem, 12vw, 4.5rem);
+    }
+
+    .hero-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .tabs {
+        flex-direction: column;
+    }
+
+    .package-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .table-container {
+        margin: 1rem -1.25rem;
+        padding: 0 1.25rem;
+        width: calc(100% + 2.5rem);
     }
 }
