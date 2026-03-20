@@ -91,6 +91,15 @@ def download_package(name: str, url: str, expected_hash: str = "") -> tuple[bool
 
     success = False
     err_msg = ""
+    
+    # Local dev override for package downloads (redirect to local disk if path exists)
+    if content is None and url.startswith("https://raw.githubusercontent.com/thegitguru/Verba/main/"):
+        relative_path = url.replace("https://raw.githubusercontent.com/thegitguru/Verba/main/", "")
+        local_dev_path = Path(r"d:\GitHub\Verba") / relative_path.replace("/", os.sep)
+        if local_dev_path.exists():
+            content = local_dev_path.read_bytes()
+            print(f"Developer Override: Using local file {local_dev_path}")
+
     if content is None:
         with Spinner(f"Installing {name} from {url}..."):
             try:
