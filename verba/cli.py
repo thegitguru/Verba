@@ -65,22 +65,48 @@ def repl() -> int:
     return 0
 
 
-def install_pkg(url: str) -> int:
+DEFAULT_REGISTRY_URL = "https://raw.githubusercontent.com/thegitguru/Verba/main/registry.json"
+
+def install_pkg(package: str) -> int:
     import urllib.request
     from urllib.parse import urlparse
+    import json
+    import os
+
+    is_url = package.startswith("http://") or package.startswith("https://")
     
-    # name from URL: if no .vrb, append it.
-    parsed = urlparse(url)
-    name = Path(parsed.path).name
-    if not name:
-        print(f"Error: Could not determine package name for URL: {url}")
-        return 1
+    if is_url:
+        url = package
+        parsed = urlparse(url)
+        name = Path(parsed.path).name
+        if not name:
+            print(f"Error: Could not determine package name for URL: {url}")
+            return 1
+    else:
+        registry_url = os.environ.get("VERBA_REGISTRY", DEFAULT_REGISTRY_URL)
+        print(f"Fetching registry from {registry_url}...")
+        try:
+            req = urllib.request.Request(registry_url, headers={'User-Agent': 'Verba'})
+            with urllib.request.urlopen(req) as response:
+                registry = json.loads(response.read().decode("utf-8"))
+        except Exception as e:
+            print(f"Error fetching registry: {e}")
+            return 1
+            
+        if package not in registry:
+            print(f"Error: Package '{package}' not found in registry.")
+            return 1
+            
+        url = registry[package]
+        name = package
+
     if not name.endswith(".vrb"):
         name += ".vrb"
         
     print(f"Installing {name} from {url}...")
     try:
-        with urllib.request.urlopen(url) as response:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Verba'})
+        with urllib.request.urlopen(req) as response:
             content = response.read()
         
         modules_dir = Path("modules")
@@ -163,8 +189,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("repl", help="Start interactive shell.")
     
     # install
-    inst_p = sub.add_parser("install", help="Install a package from a URL.")
-    inst_p.add_argument("url", help="URL of the .vrb file.")
+    inst_p = sub.add_parser("install", help="Install a package from the registry or a URL.")
+    inst_p.add_argument("package", help="Name of the package, or a direct URL to a .vrb file.")
 
     # format
     fmt_p = sub.add_parser("format", help="Format a Verba script.")
@@ -189,7 +215,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         # Check subcommands
         if ns.command == "install":
-            return install_pkg(ns.url)
+            return install_pkg(ns.package)
         if ns.command == "format":
             return format_file(Path(ns.file))
         if ns.command == "check":

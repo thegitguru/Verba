@@ -1,0 +1,13 @@
+/- A clean welcome to Verba
+
+note This is a simple Hello World script that demonstrates Verba's syntax.
+
+ask the user "What is your name?" and save to name.
+
+if name == "":
+    say "Hello, world! Welcome to Verba.".
+else:
+    say "Hello, {name}! Welcome to Verba.".
+end.
+
+say "Running some simple math: 10 + 5 = ", 10 + 5.

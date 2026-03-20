@@ -44,7 +44,7 @@ verba run yourfile.vrb
 | `verba repl` | Start an interactive REPL |
 | `verba format <file.vrb>` | Auto-format script with 4-space indentation |
 | `verba init <name>` | Initialize a new Verba project directory with scaffolding |
-| `verba install <url>` | Download & install a `.vrb` package into `modules/` |
+| `verba install <pkg/url>`| Download & install a `.vrb` package from the registry or a direct URL into `modules/` |
 
 ---
 
