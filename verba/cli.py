@@ -113,6 +113,27 @@ def install_pkg(package: str) -> int:
         modules_dir.mkdir(exist_ok=True)
         (modules_dir / name).write_bytes(content)
         print(f"Successfully installed package to {modules_dir / name}")
+        
+        # Update verba.json if it exists
+        vjson_path = Path("verba.json")
+        if vjson_path.exists():
+            try:
+                with open(vjson_path, "r", encoding="utf-8") as f:
+                    project_data = json.load(f)
+                
+                if "dependencies" not in project_data:
+                    project_data["dependencies"] = {}
+                
+                pkg_key = name[:-4] if name.endswith(".vrb") else name
+                project_data["dependencies"][pkg_key] = url
+                
+                with open(vjson_path, "w", encoding="utf-8") as f:
+                    json.dump(project_data, f, indent=2)
+                
+                print(f"Updated verba.json with dependency '{pkg_key}'")
+            except Exception as e:
+                print(f"Warning: Could not update verba.json: {e}")
+                
         return 0
     except Exception as e:
         print(f"I failed to install the package: {e}")
