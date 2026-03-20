@@ -824,9 +824,70 @@ define on_click:
 end.
 ```
 
+### `canvas` — 2D Drawing & Animation
+
+Provieds a Tkinter-backed drawing canvas with primitives, event handling, and animation loops.
+
+```verba
+/- Create a 800×600 canvas window
+c = the result of running canvas.new with "My Drawing", 800, 600.
+run c.background with "#1e1e2e".
+
+/- Draw shapes
+run c.rect with 50, 50, 200, 100, fill = "#a6e3a1".
+run c.circle with 400, 300, 60, fill = "#cba6f7", outline = "#b4befe".
+run c.line with 0, 0, 800, 600, color = "#f38ba8", width = 2.
+run c.polygon with "100,50,200,200,0,200", fill = "#89dceb".
+run c.text with 10, 10, "Hello Verba!", color = "#cdd6f4", size = 20.
+run c.arc with 200, 200, 80, 0, 270, outline = "#fab387", width = 3.
+
+/- Event handling
+run c.on_click with "handle_click".    /- sets canvas_x, canvas_y globals
+run c.on_key with "handle_key".        /- sets canvas_key global
+
+define handle_click:
+    run c.circle with canvas_x, canvas_y, 20, fill = "#f9e2af".
+end.
+
+/- Animation loop at 60 FPS
+ball_x = 400.
+ball_vx = 4.
+define update:
+    run c.clear.
+    ball_x += ball_vx.
+    if ball_x > 780: ball_vx = 0 - ball_vx. end.
+    if ball_x < 20:  ball_vx = 0 - ball_vx. end.
+    run c.circle with ball_x, 300, 20, fill = "#cba6f7".
+end.
+run c.loop with "update", 60.
+```
+
+| Method | Description |
+|---|---|
+| `canvas.new` with `title, width, height` | Create a new canvas window |
+| `c.background` with `color` | Fill background with color (hex string) |
+| `c.rect` with `x, y, w, h, fill, outline, width` | Draw a rectangle |
+| `c.circle` with `cx, cy, r, fill, outline, width` | Draw a circle |
+| `c.ellipse` with `cx, cy, rx, ry, fill, outline` | Draw an ellipse |
+| `c.line` with `x1, y1, x2, y2, color, width` | Draw a line |
+| `c.polygon` with `"x1,y1,x2,y2,...", fill, outline` | Draw a filled polygon |
+| `c.arc` with `x, y, r, start, extent, fill, outline, width` | Draw an arc segment |
+| `c.text` with `x, y, text, color, size, font, bold` | Draw text |
+| `c.image` with `x, y, path` | Draw a PNG/GIF image |
+| `c.move` with `id, dx, dy` | Move a drawn item by delta |
+| `c.delete` with `id` | Remove a specific item |
+| `c.clear` | Remove all items |
+| `c.on_click` with `callback` | Bind left-click (sets `canvas_x`, `canvas_y`) |
+| `c.on_key` with `callback` | Bind key press (sets `canvas_key`) |
+| `c.on_motion` with `callback` | Bind mouse move (sets `canvas_x`, `canvas_y`) |
+| `c.loop` with `callback, fps` | Run animation loop at given FPS |
+| `c.update` | Push pending draws (non-blocking refresh) |
+| `c.save` with `path` | Save as PostScript file |
+| `c.show` | Open window (blocking until closed) |
+| `c.close` | Destroy window |
+
 ---
 
-## 🗂️ Project Structure
 
 ```
 verba/
@@ -855,6 +916,7 @@ verba/
     ├── csv.py       — CSV read/write
     ├── xml.py       — XML parsing
     ├── gui.py       — Desktop GUI (Tkinter wrapper)
+    ├── canvas.py    — 2D drawing & animation canvas (Tkinter)
     ├── vibe.py      — WebSocket client
     └── express.py   — Express-style HTTP router
 ```

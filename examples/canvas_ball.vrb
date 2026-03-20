@@ -1,0 +1,47 @@
+note ── Canvas Example: Animated Bouncing Ball ──
+
+c = the result of running canvas.new with "Bouncing Ball", 800, 500.
+run c.background with "#1e1e2e".
+
+/- Ball state
+bx = 400.
+by = 250.
+vx = 4.
+vy = 3.
+br = 30.
+
+define draw_frame:
+    run c.clear.
+    run c.background with "#1e1e2e".
+
+    /- Move ball
+    bx += vx.
+    by += vy.
+
+    /- Bounce off walls
+    if bx - br < 0:
+        bx = br.
+        vx = 0 - vx.
+    end.
+    if bx + br > 800:
+        bx = 800 - br.
+        vx = 0 - vx.
+    end.
+    if by - br < 0:
+        by = br.
+        vy = 0 - vy.
+    end.
+    if by + br > 500:
+        by = 500 - br.
+        vy = 0 - vy.
+    end.
+
+    /- Draw trail glow
+    run c.circle with bx, by, br + 10, fill = "#313244", outline = "".
+    /- Draw ball
+    run c.circle with bx, by, br, fill = "#cba6f7", outline = "#b4befe", width = 2.
+    /- Label
+    run c.text with 10, 10, "Verba Canvas — Bouncing Ball", color = "#a6adc8", size = 14.
+end.
+
+run c.loop with "draw_frame", 60.

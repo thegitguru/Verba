@@ -42,6 +42,7 @@ class Interpreter:
         from .stdlib import vibe as _vibe_mod
         from .stdlib import xml as _xml_mod
         from .stdlib import gui as _gui_mod
+        from .stdlib import canvas as _canvas_mod
         for mod_name, mod in [
             ("http",    _http_mod),
             ("browser", _browser_mod),
@@ -61,6 +62,7 @@ class Interpreter:
             ("csv",     _csv_mod),
             ("xml",     _xml_mod),
             ("gui",     _gui_mod),
+            ("canvas",  _canvas_mod),
             ("vibe",    _vibe_mod),
         ]:
             needs_interp: set = getattr(mod, "NEEDS_INTERP", set())

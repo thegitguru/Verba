@@ -584,6 +584,68 @@ msg = the result of running conn.receive.
 <span class="keyword">run</span> conn.close.</code></pre>
             </div>
         </section>
+        </section>
+
+        <section id="stdlib-canvas" class="section">
+            <h2>Canvas — 2D Drawing &amp; Animation</h2>
+            <p>Built on tkinter. No extra dependencies. Supports shapes, text, images, events, and animation loops.</p>
+            <div class="code-block glass">
+                <pre><code><span class="comment">/- create an 800×600 window</span>
+c = the result of running canvas.new <span class="keyword">with</span> <span class="string">"My App"</span>, 800, 600.
+<span class="keyword">run</span> c.background <span class="keyword">with</span> <span class="string">"#1e1e2e"</span>.
+
+<span class="comment">/- shapes</span>
+<span class="keyword">run</span> c.rect   <span class="keyword">with</span> 50, 50, 200, 100, fill = <span class="string">"#a6e3a1"</span>.
+<span class="keyword">run</span> c.circle <span class="keyword">with</span> 400, 300, 60,  fill = <span class="string">"#cba6f7"</span>, outline = <span class="string">"#b4befe"</span>.
+<span class="keyword">run</span> c.line   <span class="keyword">with</span> 0, 0, 800, 600, color = <span class="string">"#f38ba8"</span>, width = 2.
+<span class="keyword">run</span> c.text   <span class="keyword">with</span> 10, 10, <span class="string">"Hello!"</span>, color = <span class="string">"#cdd6f4"</span>, size = 20.
+
+<span class="comment">/- click event — sets canvas_x, canvas_y globals</span>
+<span class="keyword">run</span> c.on_click <span class="keyword">with</span> <span class="string">"on_click"</span>.
+<span class="keyword">define</span> on_click:
+    <span class="keyword">run</span> c.circle <span class="keyword">with</span> canvas_x, canvas_y, 15, fill = <span class="string">"#f9e2af"</span>.
+<span class="keyword">end.</span>
+
+<span class="comment">/- 60 FPS animation loop</span>
+bx = 400. vx = 4.
+<span class="keyword">define</span> frame:
+    <span class="keyword">run</span> c.clear.
+    bx += vx.
+    <span class="keyword">if</span> bx &gt; 780: vx = 0 - vx. <span class="keyword">end.</span>
+    <span class="keyword">if</span> bx &lt; 20:  vx = 0 - vx. <span class="keyword">end.</span>
+    <span class="keyword">run</span> c.circle <span class="keyword">with</span> bx, 300, 30, fill = <span class="string">"#cba6f7"</span>.
+<span class="keyword">end.</span>
+<span class="keyword">run</span> c.loop <span class="keyword">with</span> <span class="string">"frame"</span>, 60.</code></pre>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Method</th><th>Description</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>canvas.new</code> with title, w, h</td><td>Create canvas window</td></tr>
+                        <tr><td><code>c.background</code> with color</td><td>Fill background</td></tr>
+                        <tr><td><code>c.rect</code> with x, y, w, h, fill, outline, width</td><td>Rectangle</td></tr>
+                        <tr><td><code>c.circle</code> with cx, cy, r, fill, outline, width</td><td>Circle</td></tr>
+                        <tr><td><code>c.ellipse</code> with cx, cy, rx, ry, fill, outline</td><td>Ellipse</td></tr>
+                        <tr><td><code>c.line</code> with x1, y1, x2, y2, color, width</td><td>Line</td></tr>
+                        <tr><td><code>c.polygon</code> with "x1,y1,x2,y2,...", fill, outline</td><td>Polygon</td></tr>
+                        <tr><td><code>c.arc</code> with x, y, r, start, extent, fill, outline, width</td><td>Arc segment</td></tr>
+                        <tr><td><code>c.text</code> with x, y, text, color, size, font, bold</td><td>Draw text</td></tr>
+                        <tr><td><code>c.image</code> with x, y, path</td><td>PNG/GIF image</td></tr>
+                        <tr><td><code>c.move</code> with id, dx, dy</td><td>Move item by delta</td></tr>
+                        <tr><td><code>c.delete</code> with id</td><td>Remove item</td></tr>
+                        <tr><td><code>c.clear</code></td><td>Remove all items</td></tr>
+                        <tr><td><code>c.on_click</code> with callback</td><td>Left-click event (canvas_x, canvas_y)</td></tr>
+                        <tr><td><code>c.on_key</code> with callback</td><td>Key press event (canvas_key)</td></tr>
+                        <tr><td><code>c.on_motion</code> with callback</td><td>Mouse move event</td></tr>
+                        <tr><td><code>c.loop</code> with callback, fps</td><td>Animation loop</td></tr>
+                        <tr><td><code>c.update</code></td><td>Non-blocking refresh</td></tr>
+                        <tr><td><code>c.save</code> with path</td><td>Save as PostScript</td></tr>
+                        <tr><td><code>c.show</code></td><td>Open window (blocking)</td></tr>
+                        <tr><td><code>c.close</code></td><td>Destroy window</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
         <section id="testing" class="section">
             <h2>Testing & Assert</h2>

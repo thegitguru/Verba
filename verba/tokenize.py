@@ -110,37 +110,67 @@ def tokenize_line(line: str, line_no: int) -> LineTokens:
 
 
 def _strip_comments(source: str) -> str:
-    """Remove /- single-line and /-- ... --/ block comments from source."""
+    """Remove /- single-line and /-- ... --/ block comments from source.
+    
+    Strings (single- or double-quoted) are tracked so that # inside a
+    string is NOT treated as a comment character.
+    """
     out: list[str] = []
     i = 0
     in_block = False
+    in_string: str | None = None  # current quote char, or None
     while i < len(source):
-        # Check for block comment open: /--
+        ch = source[i]
+
+        # ── inside a quoted string ────────────────────────────────────────
+        if in_string is not None:
+            # Escape sequences: skip the next char verbatim
+            if ch == "\\" and i + 1 < len(source):
+                out.append(ch)
+                out.append(source[i + 1])
+                i += 2
+                continue
+            # Closing quote
+            if ch == in_string:
+                in_string = None
+            out.append(ch)
+            i += 1
+            continue
+
+        # ── block comment open: /-- ───────────────────────────────────────
         if not in_block and source[i:i+3] == "/--":
             in_block = True
             i += 3
             continue
-        # Check for block comment close: --/
+
+        # ── block comment close: --/ ──────────────────────────────────────
         if in_block and source[i:i+3] == "--/":
             in_block = False
             i += 3
             continue
-        # Inside block comment: preserve newlines for line number accuracy
+
+        # ── inside block comment ──────────────────────────────────────────
         if in_block:
-            if source[i] == "\n":
+            if ch == "\n":
                 out.append("\n")
             i += 1
             continue
-        # Check for single-line comment: /- or #
-        if (source[i:i+2] == "/-") or (source[i] == "#"):
-            skipped = 0
-            # If it's "/-", we've consumed nothing yet by i, but we will skip from i.
-            # Handle both cases: # (1 char) and /- (2 chars)
+
+        # ── single-line comment: /- or # (only outside strings) ──────────
+        if source[i:i+2] == "/-" or ch == "#":
             while i < len(source) and source[i] != "\n":
                 out.append(" ")
                 i += 1
             continue
-        out.append(source[i])
+
+        # ── opening quote — enter string mode ────────────────────────────
+        if ch in "\"'":
+            in_string = ch
+            out.append(ch)
+            i += 1
+            continue
+
+        out.append(ch)
         i += 1
     return "".join(out)
 
