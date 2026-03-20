@@ -1,6 +1,10 @@
 {
-  "mathkit.vrb": {
+  "mathkit": {
     "url": "https://raw.githubusercontent.com/innocent0-mash/verba-packages/main/packages/mathkit/mathkit-2.0.0.vrb",
+    "version": "2.0.0"
+  },
+  "test": {
+    "url": "https://raw.githubusercontent.com/innocent0-mash/verba-packages/main/packages/test/test-2.0.0.vrb",
     "version": "2.0.0"
   }
 }

@@ -572,7 +572,13 @@ class Interpreter:
                 filename += ".vrb"
 
             from pathlib import Path
-            search_paths = [Path(filename), Path("modules") / filename]
+            stem = Path(filename).stem  # e.g. "mathkit" from "mathkit.vrb"
+            search_paths = [
+                Path(filename),                          # ./mathkit.vrb
+                Path("modules") / filename,              # modules/mathkit.vrb (legacy flat)
+                Path("modules") / stem / filename,       # modules/mathkit/mathkit.vrb (new)
+                Path("modules") / stem / "main.vrb",     # modules/mathkit/main.vrb
+            ]
             content = None
             for p in search_paths:
                 if p.exists():

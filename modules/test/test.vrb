@@ -1,0 +1,54 @@
+note test.vrb — Verbix package: testing utilities
+note Version: 2.0.0
+note Fetch via: verba verbix install http://localhost:8900/test.vrb
+
+define assert_equal needing a, b:
+    if a == b:
+        say "✓ Pass".
+        give true.
+    end.
+    say "✗ Fail: expected " + b + " but got " + a.
+    give false.
+end.
+
+define assert_true needing condition:
+    if condition:
+        say "✓ Pass".
+        give true.
+    end.
+    say "✗ Fail: expected true".
+    give false.
+end.
+
+define assert_false needing condition:
+    if condition == false:
+        say "✓ Pass".
+        give true.
+    end.
+    say "✗ Fail: expected false".
+    give false.
+end.
+
+define greet needing name:
+    give "Hello, " + name + "!".
+end.
+
+define reverse needing text:
+    result = "".
+    for char in text:
+        result = char + result.
+    end.
+    give result.
+end.
+
+define repeat needing text, times:
+    result = "".
+    count = 0.
+    while count < times:
+        result = result + text.
+        count += 1.
+    end.
+    give result.
+end.
+
+say "test 2.0.0 loaded.".
