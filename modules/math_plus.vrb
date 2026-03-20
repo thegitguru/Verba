@@ -12,8 +12,12 @@ end.
 
 define is_prime needing n:
     note Check if n is a prime number.
-    if n <= 1: give false. end.
-    if n == 2: give true. end.
+    if n <= 1:
+        give false.
+    end.
+    if n == 2:
+        give true.
+    end.
     
     i = 2.
     res = true.
