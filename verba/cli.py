@@ -4,10 +4,16 @@ import argparse
 import sys
 from pathlib import Path
 
-from .errors import VerbaError, VerbaParseError, VerbaRuntimeError
-from .parser import parse
-from .runtime import Interpreter
-from . import pkg
+try:
+    from .errors import VerbaError, VerbaParseError, VerbaRuntimeError
+    from .parser import parse
+    from .runtime import Interpreter
+    from . import pkg
+except ImportError:
+    from errors import VerbaError, VerbaParseError, VerbaRuntimeError
+    from parser import parse
+    from runtime import Interpreter
+    import pkg
 import time
 import os
 
@@ -201,7 +207,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         # Check subcommands
         if ns.command == "install":
-            from . import pkg
+            try: from . import pkg
+            except ImportError: import pkg
             return pkg.install(ns.package)
         if ns.command == "format":
             return format_file(Path(ns.file))
@@ -210,19 +217,24 @@ def main(argv: list[str] | None = None) -> int:
         if ns.command == "repl":
             return repl()
         if ns.command == "remove":
-            from . import pkg
+            try: from . import pkg
+            except ImportError: import pkg
             return pkg.remove(ns.package)
         if ns.command == "update":
-            from . import pkg
+            try: from . import pkg
+            except ImportError: import pkg
             return pkg.update(ns.package)
         if ns.command == "init":
-            from . import pkg
+            try: from . import pkg
+            except ImportError: import pkg
             return pkg.init(ns.name)
         if ns.command == "list":
-            from . import pkg
+            try: from . import pkg
+            except ImportError: import pkg
             return pkg.list_pkgs()
         if ns.command == "search":
-            from . import pkg
+            try: from . import pkg
+            except ImportError: import pkg
             return pkg.search(ns.query)
         if ns.command == "run":
             return run_file(Path(ns.file))
@@ -246,3 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     except VerbaError as e:
         print(e, file=sys.stderr)
         return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

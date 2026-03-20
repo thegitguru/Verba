@@ -44,35 +44,54 @@ class Spinner:
 def fetch_registry() -> dict:
     registry_url = os.environ.get("VERBA_REGISTRY", DEFAULT_REGISTRY_URL)
     
-    # Handle local file paths
-    registry_path = Path(registry_url)
-    if registry_path.exists() and registry_path.is_file():
+    # Check if it is a local file path
+    result = None
+    if os.path.isfile(registry_url):
         try:
-            with open(registry_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+            with open(registry_url, "r", encoding="utf-8") as f:
+                result = json.load(f)
         except Exception as e:
             print(f"Error reading local registry {registry_url}: {e}")
             return {}
-
-    # Local hardcoded fallback for development convenience
-    local_dev_reg = Path(r"d:\GitHub\Verba\registry.json")
-    if registry_url == DEFAULT_REGISTRY_URL and local_dev_reg.exists():
-        try:
-            with open(local_dev_reg, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass # Fallback to web request
             
-    with Spinner(f"Fetching registry from {registry_url}..."):
-        try:
-            req = urllib.request.Request(registry_url, headers={'User-Agent': 'Verba'})
-            with urllib.request.urlopen(req) as response:
-                result = json.loads(response.read().decode("utf-8"))
-        except Exception as e:
-            print(f"Error fetching registry {registry_url}: {e}")
-            return {}
+    if result is None:
+        # Local hardcoded fallback for development convenience
+        local_dev_reg = r"d:\GitHub\Verba\registry.json"
+        if registry_url == DEFAULT_REGISTRY_URL and os.path.isfile(local_dev_reg):
+            try:
+                with open(local_dev_reg, "r", encoding="utf-8") as f:
+                    result = json.load(f)
+            except Exception:
+                pass # Fallback to web request
+                
+    if result is None:
+        with Spinner(f"Fetching registry from {registry_url}..."):
+            try:
+                # Check if URI scheme is http/https
+                is_remote = registry_url.startswith("http")
+                if not is_remote:
+                    # Fallback load as local if urlopen would fail
+                    if os.path.exists(registry_url):
+                        with open(registry_url, "r", encoding="utf-8") as f:
+                            result = json.load(f)
+                    else:
+                        raise Exception(f"Registry URL '{registry_url}' must start with http/https if it's not a local file.")
+                else:
+                    req = urllib.request.Request(registry_url, headers={'User-Agent': 'Verba'})
+                    with urllib.request.urlopen(req) as response:
+                        result = json.loads(response.read().decode("utf-8"))
+            except Exception as e:
+                print(f"Error resolving registry {registry_url}: {e}")
+                return {}
+    
+    # NORMALIZATION: Handle old flat format or missing top-level "packages"
+    if result and not isinstance(result.get("packages"), dict):
+        # If it looks like a dict of packages (keys are strings, values are dicts/strings)
+        if isinstance(result, dict) and len(result) > 0:
+            # Wrap in "packages" for the rest of the code
+            return {"packages": result}
             
-    return result
+    return result if result else {}
 
 
 def compute_sha256(content: bytes) -> str:
