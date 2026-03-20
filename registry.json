@@ -20,5 +20,17 @@
     "description": "Simplify date formatting and human-friendly time checks.",
     "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/date_helper.vrb",
     "hash": "9ef470828d25e9da1333822e88f71c6b0f99814127a71f2704bffd37c0f5dbf3"
+  },
+  "string_box": {
+    "version": "1.0.0",
+    "description": "Fancy string formatting and box draws for CLI apps.",
+    "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/string_box.vrb",
+    "hash": "87deecf937239226285cbfd1f2bec2088395ef827081757196b5b49e2d7052f2"
+  },
+  "math_plus": {
+    "version": "1.0.0",
+    "description": "Factorials, prime checks, and more advanced math operations.",
+    "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/math_plus.vrb",
+    "hash": "322e45896172657d7f29bc715919a3727dde1a9c32f18968c0e22fcf7149f6da"
   }
 }
