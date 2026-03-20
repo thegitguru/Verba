@@ -396,6 +396,33 @@ def list_pkgs() -> int:
     return 0
 
 
+def search(query: str) -> int:
+    registry = fetch_registry()
+    if not registry:
+        return 1
+        
+    print(f"Searching for '{query}' in Verba Registry:")
+    found = False
+    for name, data in registry.items():
+        if query.lower() in name.lower():
+            version = "unknown"
+            description = ""
+            if isinstance(data, dict):
+                version = data.get("version", "unknown")
+                description = data.get("description", "")
+            
+            output = f"  - {name} (v{version})"
+            if description:
+                output += f" - {description}"
+            print(output)
+            found = True
+            
+    if not found:
+        print(f"No packages matching '{query}' found.")
+    
+    return 0
+
+
 def init(name: str) -> int:
     try:
         project_dir = Path(name)
