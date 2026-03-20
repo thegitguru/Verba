@@ -40,6 +40,7 @@ verba run yourfile.vrb
 | Command | Description |
 |---|---|
 | `verba run <file.vrb>` | Run a Verba script |
+| `verba watch <file.vrb>`| Watch a Verba script and re-run automatically on changes (Hot Reload) |
 | `verba check <file.vrb>` | Parse only — syntax check without running |
 | `verba repl` | Start an interactive REPL |
 | `verba format <file.vrb>` | Auto-format script with 4-space indentation |

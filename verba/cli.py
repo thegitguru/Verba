@@ -8,6 +8,8 @@ from .errors import VerbaError, VerbaParseError, VerbaRuntimeError
 from .parser import parse
 from .runtime import Interpreter
 from . import pkg
+import time
+import os
 
 
 def _read_text(path: Path) -> str:
@@ -29,6 +31,45 @@ def check_file(path: Path) -> int:
     parse(source)
     print(f"OK: {path}")
     return 0
+
+
+def watch_file(path: Path) -> int:
+    if not path.exists():
+        print(f"I cannot watch '{path}' because it does not exist.")
+        return 1
+    
+    print(f"👀 Watching '{path}' for changes... (Press Ctrl+C to stop)")
+    last_mtime = path.stat().st_mtime
+    
+    # Initial run
+    print("-" * 30)
+    try:
+        run_file(path)
+    except Exception as e:
+        print(f"Error during execution: {e}")
+    print("-" * 30)
+
+    try:
+        while True:
+            time.sleep(0.5)
+            if not path.exists(): continue
+            
+            current_mtime = path.stat().st_mtime
+            if current_mtime != last_mtime:
+                last_mtime = current_mtime
+                # Clear terminal screen for a fresh look on each reload
+                os.system('cls' if os.name == 'nt' else 'clear')
+                print(f"🔄 Change detected in '{path}'! Re-running...\n")
+                print("-" * 30)
+                try:
+                    run_file(path)
+                except Exception as e:
+                    print(f"Error during execution: {e}")
+                print("-" * 30)
+                print("\nWaiting for next change...")
+    except KeyboardInterrupt:
+        print("\nStopped watching.")
+        return 0
 
 
 def repl() -> int:
@@ -141,6 +182,10 @@ def main(argv: list[str] | None = None) -> int:
     # list
     sub.add_parser("list", help="List currently installed packages.")
 
+    # watch
+    watch_p = sub.add_parser("watch", help="Watch a Verba script and re-run on changes.")
+    watch_p.add_argument("file", help="The .vrb file to watch.")
+
     # original/legacy args (for backward compatibility if possible)
     p.add_argument("legacy_file", nargs="?", help="Legacy file argument.")
     p.add_argument("--repl",    action="store_true", help="Start an interactive REPL.")
@@ -181,6 +226,8 @@ def main(argv: list[str] | None = None) -> int:
             return pkg.search(ns.query)
         if ns.command == "run":
             return run_file(Path(ns.file))
+        if ns.command == "watch":
+            return watch_file(Path(ns.file))
             
         # legacy handling
         if ns.repl or (ns.command is None and ns.legacy_file is None):
