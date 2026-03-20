@@ -42,20 +42,32 @@ class Spinner:
 
 def fetch_registry() -> dict:
     registry_url = os.environ.get("VERBA_REGISTRY", DEFAULT_REGISTRY_URL)
+    
+    # Local fallback testing override
+    if registry_url == DEFAULT_REGISTRY_URL and Path("registry.json").exists():
+        try:
+            with open("registry.json", "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            pass # Fallback to web request
+            
     with Spinner(f"Fetching registry from {registry_url}..."):
         try:
             req = urllib.request.Request(registry_url, headers={'User-Agent': 'Verba'})
             with urllib.request.urlopen(req) as response:
-                return json.loads(response.read().decode("utf-8"))
+                result = json.loads(response.read().decode("utf-8"))
         except Exception as e:
             print(f"Error fetching registry: {e}")
             return {}
+            
+    return result
 
 
 def download_package(name: str, url: str) -> bool:
     if not name.endswith(".vrb"):
         name += ".vrb"
         
+    success = False
     with Spinner(f"Installing {name} from {url}..."):
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'Verba'})
@@ -65,11 +77,16 @@ def download_package(name: str, url: str) -> bool:
             modules_dir = Path("modules")
             modules_dir.mkdir(exist_ok=True)
             (modules_dir / name).write_bytes(content)
-            print(f"Successfully installed to {modules_dir / name}")
-            return True
+            success = True
         except Exception as e:
-            print(f"I failed to install the package: {e}")
-            return False
+            err_msg = str(e)
+            
+    if success:
+        print(f"Successfully installed to {modules_dir / name}")
+        return True
+    else:
+        print(f"I failed to install the package: {err_msg}")
+        return False
 
 
 def _update_verba_json(pkg_key: str, url: str, version: str = "unknown"):
