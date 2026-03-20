@@ -209,11 +209,15 @@ def install(package: str | None = None) -> int:
             print(f"Error reading verba.json: {e}")
             return 1
 
-    is_url = package.startswith("http://") or package.startswith("https://")
+    req_version = None
+    if package is not None and not package.startswith("http://") and not package.startswith("https://") and "@" in package:
+        package, _, req_version = package.partition("@")
+
+    is_url = package is not None and (package.startswith("http://") or package.startswith("https://"))
     
     if is_url:
         url = str(package)
-        version = "unknown"
+        version = req_version if req_version else "unknown"
         parsed = urlparse(url)
         name = Path(parsed.path).name
         if not name:
@@ -231,10 +235,23 @@ def install(package: str | None = None) -> int:
         registry_entry = registry[package]
         expected_hash = ""
         if isinstance(registry_entry, dict):
-            url = str(registry_entry.get("url", ""))
-            version = str(registry_entry.get("version", "unknown"))
-            expected_hash = str(registry_entry.get("hash", ""))
+            if req_version and "versions" in registry_entry and req_version in registry_entry["versions"]:
+                ver_entry = registry_entry["versions"][req_version]
+                if isinstance(ver_entry, dict):
+                    url = str(ver_entry.get("url", ""))
+                    expected_hash = str(ver_entry.get("hash", ""))
+                else:
+                    url = str(ver_entry)
+                version = str(req_version)
+            else:
+                if req_version:
+                    print(f"Warning: Version {req_version} not found for {package}. Falling back to default.")
+                url = str(registry_entry.get("url", ""))
+                version = str(registry_entry.get("version", "unknown"))
+                expected_hash = str(registry_entry.get("hash", ""))
         else:
+            if req_version:
+                print(f"Warning: Versioning not supported by registry entry. Falling back to default.")
             url = str(registry_entry)
             version = "unknown"
             
