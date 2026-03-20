@@ -7,6 +7,39 @@ from pathlib import Path
 from .errors import VerbaError, VerbaParseError, VerbaRuntimeError
 from .parser import parse
 from .runtime import Interpreter
+import threading
+
+
+class Spinner:
+    def __init__(self, message: str = "Working"):
+        self.message = message
+        self.running = False
+        self.thread: threading.Thread | None = None
+
+    def _spin(self):
+        import time
+        import sys
+        chars = "|/-\\"
+        i = 0
+        sys.stdout.write(f"{self.message}  ")
+        while self.running:
+            sys.stdout.write(f"\b{chars[i % 4]}")
+            sys.stdout.flush()
+            time.sleep(0.1)
+            i += 1
+        sys.stdout.write("\b \n")
+        sys.stdout.flush()
+
+    def __enter__(self):
+        import threading
+        self.running = True
+        self.thread = threading.Thread(target=self._spin, daemon=True)
+        self.thread.start()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.running = False
+        if self.thread:
+            self.thread.join()
 
 
 def _read_text(path: Path) -> str:
@@ -84,14 +117,14 @@ def install_pkg(package: str) -> int:
             return 1
     else:
         registry_url = os.environ.get("VERBA_REGISTRY", DEFAULT_REGISTRY_URL)
-        print(f"Fetching registry from {registry_url}...")
-        try:
-            req = urllib.request.Request(registry_url, headers={'User-Agent': 'Verba'})
-            with urllib.request.urlopen(req) as response:
-                registry = json.loads(response.read().decode("utf-8"))
-        except Exception as e:
-            print(f"Error fetching registry: {e}")
-            return 1
+        with Spinner(f"Fetching registry from {registry_url}..."):
+            try:
+                req = urllib.request.Request(registry_url, headers={'User-Agent': 'Verba'})
+                with urllib.request.urlopen(req) as response:
+                    registry = json.loads(response.read().decode("utf-8"))
+            except Exception as e:
+                print(f"Error fetching registry: {e}")
+                return 1
             
         if package not in registry:
             print(f"Error: Package '{package}' not found in registry.")
@@ -103,41 +136,41 @@ def install_pkg(package: str) -> int:
     if not name.endswith(".vrb"):
         name += ".vrb"
         
-    print(f"Installing {name} from {url}...")
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Verba'})
-        with urllib.request.urlopen(req) as response:
-            content = response.read()
-        
-        modules_dir = Path("modules")
-        modules_dir.mkdir(exist_ok=True)
-        (modules_dir / name).write_bytes(content)
-        print(f"Successfully installed package to {modules_dir / name}")
-        
-        # Update verba.json if it exists
-        vjson_path = Path("verba.json")
-        if vjson_path.exists():
-            try:
-                with open(vjson_path, "r", encoding="utf-8") as f:
-                    project_data = json.load(f)
-                
-                if "dependencies" not in project_data:
-                    project_data["dependencies"] = {}
-                
-                pkg_key = name[:-4] if name.endswith(".vrb") else name
-                project_data["dependencies"][pkg_key] = url
-                
-                with open(vjson_path, "w", encoding="utf-8") as f:
-                    json.dump(project_data, f, indent=2)
-                
-                print(f"Updated verba.json with dependency '{pkg_key}'")
-            except Exception as e:
-                print(f"Warning: Could not update verba.json: {e}")
-                
-        return 0
-    except Exception as e:
-        print(f"I failed to install the package: {e}")
-        return 1
+    with Spinner(f"Installing {name} from {url}..."):
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Verba'})
+            with urllib.request.urlopen(req) as response:
+                content = response.read()
+            
+            modules_dir = Path("modules")
+            modules_dir.mkdir(exist_ok=True)
+            (modules_dir / name).write_bytes(content)
+            print(f"Successfully installed package to {modules_dir / name}")
+            
+            # Update verba.json if it exists
+            vjson_path = Path("verba.json")
+            if vjson_path.exists():
+                try:
+                    with open(vjson_path, "r", encoding="utf-8") as f:
+                        project_data = json.load(f)
+                    
+                    if "dependencies" not in project_data:
+                        project_data["dependencies"] = {}
+                    
+                    pkg_key = name[:-4] if name.endswith(".vrb") else name
+                    project_data["dependencies"][pkg_key] = url
+                    
+                    with open(vjson_path, "w", encoding="utf-8") as f:
+                        json.dump(project_data, f, indent=2)
+                    
+                    print(f"Updated verba.json with dependency '{pkg_key}'")
+                except Exception as e:
+                    print(f"Warning: Could not update verba.json: {e}")
+                    
+            return 0
+        except Exception as e:
+            print(f"I failed to install the package: {e}")
+            return 1
 
 
 def remove_pkg(package: str) -> int:
@@ -151,32 +184,35 @@ def remove_pkg(package: str) -> int:
     modules_dir = Path("modules")
     pkg_path = modules_dir / name
     
-    if pkg_path.exists():
-        try:
-            pkg_path.unlink()
-            print(f"Removed {pkg_path}")
-        except OSError as e:
-            print(f"Failed to remove {pkg_path}: {e}")
-            return 1
-    else:
-        print(f"Package '{package}' is not installed in modules/ directory.")
-        
-    vjson_path = Path("verba.json")
-    if vjson_path.exists():
-        try:
-            with open(vjson_path, "r", encoding="utf-8") as f:
-                project_data = json.load(f)
-                
-            pkg_key = name[:-4]
-            if "dependencies" in project_data and pkg_key in project_data["dependencies"]:
-                del project_data["dependencies"][pkg_key]
-                with open(vjson_path, "w", encoding="utf-8") as f:
-                    json.dump(project_data, f, indent=2)
-                print(f"Removed dependency '{pkg_key}' from verba.json")
-        except Exception as e:
-            print(f"Warning: Could not update verba.json: {e}")
+    with Spinner(f"Removing {package}..."):
+        import time
+        time.sleep(0.5) # for aesthetics
+        if pkg_path.exists():
+            try:
+                pkg_path.unlink()
+                print(f"Removed {pkg_path}")
+            except OSError as e:
+                print(f"Failed to remove {pkg_path}: {e}")
+                return 1
+        else:
+            print(f"Package '{package}' is not installed in modules/ directory.")
             
-    return 0
+        vjson_path = Path("verba.json")
+        if vjson_path.exists():
+            try:
+                with open(vjson_path, "r", encoding="utf-8") as f:
+                    project_data = json.load(f)
+                    
+                pkg_key = name[:-4]
+                if "dependencies" in project_data and pkg_key in project_data["dependencies"]:
+                    del project_data["dependencies"][pkg_key]
+                    with open(vjson_path, "w", encoding="utf-8") as f:
+                        json.dump(project_data, f, indent=2)
+                    print(f"Removed dependency '{pkg_key}' from verba.json")
+            except Exception as e:
+                print(f"Warning: Could not update verba.json: {e}")
+                
+        return 0
 
 
 def format_file(path: Path) -> int:
