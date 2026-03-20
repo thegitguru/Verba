@@ -85,13 +85,14 @@ def fetch_registry() -> dict:
                 return {}
     
     # NORMALIZATION: Handle old flat format or missing top-level "packages"
-    if result and not isinstance(result.get("packages"), dict):
-        # If it looks like a dict of packages (keys are strings, values are dicts/strings)
+    if result is None:
+        return {}
+        
+    if not isinstance(result.get("packages"), dict):
         if isinstance(result, dict) and len(result) > 0:
-            # Wrap in "packages" for the rest of the code
             return {"packages": result}
             
-    return result if result else {}
+    return result
 
 
 def compute_sha256(content: bytes) -> str:
