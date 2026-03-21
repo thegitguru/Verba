@@ -255,7 +255,9 @@ def _parse_atom(tokens: list[Token], tokens_lc: list[str], i: int, *, span: Span
         return BinaryOp(span, "*", Literal(span, -1), inner), next_i
 
     if (t.value.startswith('"') and t.value.endswith('"')) or (t.value.startswith("'") and t.value.endswith("'")):
-        raw_str = t.value[1:-1].replace('\\n', '\n').replace('\\t', '\t').replace('\\r', '\r')
+        # Python 3 trick to decode string escapes in a string
+        raw_str = t.value[1:-1].encode('latin-1', 'backslashreplace').decode('unicode_escape')
+        
         # Check for {var} interpolation ONLY if double-quoted
         if t.value.startswith('"') and '{' in raw_str:
             return _parse_interpolated(raw_str, span), i + 1
