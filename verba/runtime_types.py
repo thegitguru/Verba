@@ -22,6 +22,7 @@ class Function:
     decorators: list[str] = None
     defaults: dict = None
     doc: Optional[str] = None
+    defining_env: Optional["Environment"] = None
     def __post_init__(self):
         if self.defaults is None: self.defaults = {}
         if self.decorators is None: self.decorators = []
@@ -89,7 +90,8 @@ class Environment:
         if self.parent: return self.parent.get(name)
         raise KeyError(name)
 
-    def set(self, name: str, value: Any) -> None:
+    def set(self, name: str, value: Any, local: bool = False) -> None:
+        if local: self.values[name] = value; return
         if name in self.values: self.values[name] = value; return
         if self.parent and self.parent.contains(name): self.parent.set(name, value); return
         self.values[name] = value

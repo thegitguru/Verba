@@ -494,6 +494,7 @@ class Interpreter:
                 doc=doc
             )
             fn.defaults = {k: self._eval_expr(v, env=env, context="general") for k, v in (s.defaults or {}).items()}
+            fn.defining_env = env
             # Store scoped to current environment
             env.functions[s.name] = fn
             return
@@ -1114,14 +1115,14 @@ class Interpreter:
         evaled_args = [self._eval_expr(a, env=caller_env, context="general") for a in args]
         evaled_kwargs = {k: self._eval_expr(v, env=caller_env, context="general") for k, v in (kwargs or {}).items()}
         
-        call_env = Environment(parent=self.globals)
+        call_env = Environment(parent=fn.defining_env or self.globals)
         for i, p in enumerate(fn.params):
             if p in evaled_kwargs:
-                call_env.set(p, evaled_kwargs[p])
+                call_env.set(p, evaled_kwargs[p], local=True)
             elif i < len(evaled_args):
-                call_env.set(p, evaled_args[i])
+                call_env.set(p, evaled_args[i], local=True)
             elif p in fn.defaults:
-                call_env.set(p, fn.defaults[p])
+                call_env.set(p, fn.defaults[p], local=True)
             else:
                 raise VerbaRuntimeError(f"Function {name} missing value for parameter {p}.", line_no=line_no)
                 
@@ -1155,11 +1156,11 @@ class Interpreter:
         if fn is None: raise VerbaRuntimeError(f"Module {mod.name} has no function {name}.", line_no=line_no)
         evaled_args = [self._eval_expr(a, env=caller_env, context="general") for a in args]
         evaled_kwargs = {k: self._eval_expr(v, env=caller_env, context="general") for k, v in (kwargs or {}).items()}
-        call_env = Environment(parent=self.globals) # Modules can see core globals
+        call_env = Environment(parent=fn.defining_env or self.globals) # Modules can see core globals
         for i, p in enumerate(fn.params):
-            if p in evaled_kwargs: call_env.set(p, evaled_kwargs[p])
-            elif i < len(evaled_args): call_env.set(p, evaled_args[i])
-            elif p in fn.defaults: call_env.set(p, fn.defaults[p])
+            if p in evaled_kwargs: call_env.set(p, evaled_kwargs[p], local=True)
+            elif i < len(evaled_args): call_env.set(p, evaled_args[i], local=True)
+            elif p in fn.defaults: call_env.set(p, fn.defaults[p], local=True)
         try:
             self._exec_block(fn.body, env=call_env)
         except _ReturnSignal as r:
@@ -1184,15 +1185,15 @@ class Interpreter:
         evaled_args = [self._eval_expr(a, env=caller_env, context="general") for a in args]
         evaled_kwargs = {k: self._eval_expr(v, env=caller_env, context="general") for k, v in (kwargs or {}).items()}
         
-        call_env = Environment(parent=self.globals)
+        call_env = Environment(parent=fn.defining_env or self.globals)
         call_env.set("self", obj)
         for i, p in enumerate(fn.params):
             if p in evaled_kwargs:
-                call_env.set(p, evaled_kwargs[p])
+                call_env.set(p, evaled_kwargs[p], local=True)
             elif i < len(evaled_args):
-                call_env.set(p, evaled_args[i])
+                call_env.set(p, evaled_args[i], local=True)
             elif p in fn.defaults:
-                call_env.set(p, fn.defaults[p])
+                call_env.set(p, fn.defaults[p], local=True)
             # note: 'init' often has defaults handled by ClassDef, but we stick to this for consistency
             
         try:
