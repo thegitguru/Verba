@@ -428,20 +428,24 @@ def update(package: str | None = None) -> int:
     return 0
 
 
+import re
+
 def list_pkgs() -> int:
+    registry_data = fetch_registry()
+    registry = registry_data.get("packages", {})
+
     modules_dir = Path("modules")
     if not modules_dir.exists() or not modules_dir.is_dir():
         print("No packages installed (modules/ directory not found).")
         return 0
         
-    pkgs = [p.name for p in modules_dir.iterdir() if p.name.endswith(".vrb")]
+    pkgs = [p for p in modules_dir.iterdir() if p.name.endswith(".vrb")]
     if not pkgs:
         print("No packages installed.")
         return 0
         
-    print("Installed Verba Packages:")
-    
-    versions = {}
+    # Read versions from verba.json as the primary source of truth for managed packages
+    local_versions = {}
     vjson_path = Path("verba.json")
     if vjson_path.exists():
         try:
@@ -450,14 +454,50 @@ def list_pkgs() -> int:
             deps = data.get("dependencies", {})
             for k, v in deps.items():
                 if isinstance(v, dict) and "version" in v:
-                    versions[k] = v["version"]
+                    local_versions[k] = v["version"]
         except Exception:
             pass
 
-    for pkg in pkgs:
-        name = pkg[:-4]
-        ver = versions.get(name, "unknown")
-        print(f"  - {name} (v{ver})")
+    print("Installed Verba Packages:")
+    
+    # regex to find v1.2 or v1.2.3 in the file content (fallback)
+    ver_re = re.compile(r"v(\d+\.\d+(\.\d+)?)")
+
+    for pkg_path in pkgs:
+        name = pkg_path.stem # name without .vrb
+        
+        # Try to find version in verba.json first
+        ver = local_versions.get(name, "unknown")
+        
+        # Fallback: Extract from file if unknown
+        if ver == "unknown":
+            try:
+                with open(pkg_path, "r", encoding="utf-8") as f:
+                    content = "".join([f.readline() for _ in range(10)])
+                    m = ver_re.search(content)
+                    if m:
+                        ver = m.group(1)
+            except Exception:
+                pass
+
+        # Normalize the name for registry lookup
+        reg_key = name
+        for k in registry.keys():
+            if name == k or name.startswith(k + "_"):
+                reg_key = k
+                break
+        
+        # Check against registry
+        status = ""
+        if reg_key in registry:
+            latest = registry[reg_key].get("latest", "unknown")
+            if ver != "unknown" and latest != "unknown":
+                if ver == latest:
+                    status = " \033[92m[latest]\033[0m"
+                else:
+                    status = f" \033[93m[outdated, latest: v{latest}]\033[0m"
+        
+        print(f"  - {name} (v{ver}){status}")
         
     return 0
 

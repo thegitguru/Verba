@@ -1,4 +1,4 @@
-note Date Helper Module
+note Date Helper Module v1.0.0
 
 define get_full_date:
     note Returns the full date string like "2026-03-20".

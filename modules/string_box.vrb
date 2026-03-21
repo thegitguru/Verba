@@ -1,4 +1,4 @@
-note String Box Utility for Verba
+note String Box Utility v1.0.0 for Verba
 
 define draw_box needing text:
     note Draws a beautiful box around the specified text.
