@@ -16,3 +16,4 @@ dist/
 *.spec.bak
 __pycache__/
 *.pyc
+usage.vrb

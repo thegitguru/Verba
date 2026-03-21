@@ -1,0 +1,37 @@
+note Advanced Math Utilities for Verba
+
+define factorial needing n:
+    note Recursive factorial calculation.
+    if n <= 1:
+        give 1.
+    end.
+    m = n - 1.
+    prev = the result of running factorial with m.
+    give n * prev.
+end.
+
+define is_prime needing n:
+    note Check if n is a prime number.
+    if n <= 1:
+        give false.
+    end.
+    if n == 2:
+        give true.
+    end.
+    
+    i = 2.
+    res = true.
+    while i * i <= n:
+        if n % i == 0:
+            res = false.
+            stop.
+        end.
+        i += 1.
+    end.
+    give res.
+end.
+
+define power needing base, exp:
+    note Simplified exponentiation.
+    give base ** exp.
+end.
