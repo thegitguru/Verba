@@ -27,7 +27,7 @@ set "WHITE=%ESC%[97m"
 set "GREY=%ESC%[90m"
 
 :: ── Build metadata ──────────────────────────────────────────
-set "BUILD_VERSION=1.0.0"
+set "BUILD_VERSION=1.5.0"
 set "PRODUCT_NAME=Verba"
 set "SPEC_FILE=verba.spec"
 set "OUTPUT_BINARY=dist\verba.exe"
@@ -179,7 +179,7 @@ for %%X in (%RELEASE_EXTRAS%) do (
     echo Verba v%BUILD_VERSION% — Windows x64
     echo Built : %DATE% %TIME%
     echo.
-    echo https://github.com/yourname/verba
+    echo https://github.com/thegitguru/Verba
 ) > "%RELEASE_STAGING%\RELEASE_INFO.txt"
 call :fn_ok "RELEASE_INFO.txt written"
 
