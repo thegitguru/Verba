@@ -1,7 +1,6 @@
-import websockets.sync.client as ws
-
 def connect(url):
     try:
+        import websockets.sync.client as ws
         conn = ws.connect(str(url))
         return {"_conn": conn, "url": str(url)}
     except Exception as e:
