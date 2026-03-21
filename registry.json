@@ -7,7 +7,7 @@
       "license": "MIT",
       "versions": {
         "1.0.0": {
-          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/date_helper.vrb",
+          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/date_helper_v1.0.0.vrb",
           "hash": "9ef470828d25e9da1333822e88f71c6b0f99814127a71f2704bffd37c0f5dbf3"
         }
       }
@@ -19,7 +19,7 @@
       "license": "MIT",
       "versions": {
         "1.0.0": {
-          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/string_box.vrb",
+          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/string_box_v1.0.0.vrb",
           "hash": "87deecf937239226285cbfd1f2bec2088395ef827081757196b5b49e2d7052f2"
         }
       }
@@ -31,19 +31,19 @@
       "license": "MIT",
       "versions": {
         "1.0.0": {
-          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/math_plus_v1.0.vrb",
+          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/math_plus_v1.0.0.vrb",
           "hash": "589ec985549f651e4d70fae8770dd727a7f69ccd2a7134150ede1c98369c069b"
         },
         "1.1.0": {
-          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/math_plus_v1.1.vrb",
+          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/math_plus_v1.1.0.vrb",
           "hash": "73d2bd53c448b6d59502c108d2a6698211ba524e2485f30647e3846a65e6ce93"
         },
         "1.2.0": {
-          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/math_plus_v1.2.vrb",
+          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/math_plus_v1.2.0.vrb",
           "hash": "312d91eac421a03b4564641b8933cb966799b672c17dc72b12cee876775354df"
         },
         "1.3.0": {
-          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/math_plus_v1.3.vrb",
+          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/math_plus_v1.3.0.vrb",
           "hash": "19e2f33c0cf6ee0bef35c1edaddf945bf9f209180da1138cf77e33eebd8e3e58"
         },
         "1.4.0": {
@@ -59,7 +59,7 @@
       "license": "MIT",
       "versions": {
         "1.0.0": {
-          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/hello.vrb",
+          "url": "https://raw.githubusercontent.com/thegitguru/Verba/main/modules/test_pkg_v1.0.0.vrb",
           "hash": "112517c736ccf7f5e07f35c055a5e7f49dea246d6370a8bbb46b6a4173d19d89"
         }
       }
