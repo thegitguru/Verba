@@ -1,4 +1,4 @@
-note Advanced Math Utilities for Verba
+note Advanced Math Utilities v1.1.0 for Verba
 
 define factorial needing n:
     note Recursive factorial calculation.
@@ -18,7 +18,6 @@ define is_prime needing n:
     if n == 2:
         give true.
     end.
-    
     i = 2.
     res = true.
     while i * i <= n:
@@ -32,6 +31,57 @@ define is_prime needing n:
 end.
 
 define power needing base, exp:
-    note Simplified exponentiation.
+    note Raises base to the power of exp.
     give base ** exp.
+end.
+
+define gcd needing a, b:
+    note Greatest Common Divisor via Euclidean algorithm.
+    while b != 0:
+        t = b.
+        b = a % b.
+        a = t.
+    end.
+    give a.
+end.
+
+define lcm needing a, b:
+    note Least Common Multiple.
+    if a == 0:
+        give 0.
+    end.
+    if b == 0:
+        give 0.
+    end.
+    g = the result of running gcd with a, b.
+    val = (a * b) / g.
+    give val.
+end.
+
+define fibonacci needing n:
+    note Returns the Nth Fibonacci number.
+    if n <= 1:
+        give n.
+    end.
+    a = 0.
+    b = 1.
+    count = n - 1.
+    repeat count times:
+        t = a + b.
+        a = b.
+        b = t.
+    end.
+    give b.
+end.
+
+define deg_to_rad needing deg:
+    note Converts degrees to radians.
+    pi = 3.141592653589793.
+    give deg * (pi / 180).
+end.
+
+define rad_to_deg needing rad:
+    note Converts radians to degrees.
+    pi = 3.141592653589793.
+    give rad * (180 / pi).
 end.
