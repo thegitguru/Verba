@@ -195,6 +195,9 @@ def main(argv: list[str] | None = None) -> int:
     # outdated
     sub.add_parser("outdated", help="List packages that have updates available.")
 
+    # sync
+    sub.add_parser("sync", help="Synchronize modules with the verba-lock.json file.")
+
     # original/legacy args (for backward compatibility if possible)
     p.add_argument("legacy_file", nargs="?", help="Legacy file argument.")
     p.add_argument("--repl",    action="store_true", help="Start an interactive REPL.")
@@ -233,6 +236,10 @@ def main(argv: list[str] | None = None) -> int:
             try: from . import pkg
             except ImportError: import pkg
             return pkg.list_pkgs(outdated_only=True)
+        if ns.command == "sync":
+            try: from . import pkg
+            except ImportError: import pkg
+            return pkg.install(sync_only=True)
         if ns.command == "init":
             try: from . import pkg
             except ImportError: import pkg

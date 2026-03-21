@@ -197,7 +197,33 @@ def _update_verba_json(pkg_key: str, url: str, version: str = "unknown", package
         print(f"Warning: Could not update verba-lock.json: {e}")
 
 
-def install(package: str | None = None) -> int:
+def install(package: str | None = None, sync_only: bool = False) -> int:
+    # If sync_only specified, we strictly use verba-lock.json
+    if sync_only:
+        lock_path = Path("verba-lock.json")
+        if not lock_path.exists():
+            print("Error: verba-lock.json not found. Run 'verba install' first to generate it.")
+            return 1
+            
+        print("Syncing modules with verba-lock.json...")
+        try:
+            with open(lock_path, "r", encoding="utf-8") as lf:
+                lock_data = json.load(lf)
+            deps = lock_data.get("dependencies", {})
+            if not deps:
+                print("No dependencies found in verba-lock.json.")
+                return 0
+                
+            for dep_name, dep_info in deps.items():
+                dep_url = dep_info["url"]
+                integrity = str(dep_info.get("integrity", ""))
+                expected_hash = integrity.split("-")[1] if integrity.startswith("sha256-") else ""
+                download_package(dep_name, dep_url, expected_hash)
+            return 0
+        except Exception as e:
+            print(f"Error during sync: {e}")
+            return 1
+
     # If no package specified, install from verba.json
     if package is None:
         vjson_path = Path("verba.json")
