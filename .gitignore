@@ -3,6 +3,7 @@ verba/stdlib/__pycache__/
 out.txt
 run_examples.txt
 verba_lang.egg-info/
+publisher/
 
 # webapp runtime data
 examples/webapp/todos.txt
