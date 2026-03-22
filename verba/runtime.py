@@ -268,17 +268,31 @@ class Interpreter:
             elif s.forced_type == "list":
                 # parser stores list literals as Literal(list[Expr]) already evaluated to python values
                 if isinstance(value, list):
-                    # Treat unknown bare words as literal words (so "a list of red, green" works),
+                    # treat unknown bare words as literal words (so "a list of red, green" works),
                     # but still resolve real variables if they already exist.
                     value = [self._eval_expr(v, env=env, context="say") if isinstance(v, ast.Expr) else v for v in value]
-            env.set(s.name, value)
+            try:
+                env.set(s.name, value)
+            except KeyError as e:
+                raise VerbaRuntimeError(str(e), line_no=ln, col=col, line=raw)
+            return
+
+        if isinstance(s, ast.Constant):
+            value = self._eval_expr(s.value, env=env, context="general")
+            try:
+                env.set(s.name, value, is_constant=True)
+            except KeyError as e:
+                raise VerbaRuntimeError(str(e), line_no=ln, col=col, line=raw)
             return
 
         if isinstance(s, ast.SetVar):
             if not env.contains(s.name):
                 raise VerbaRuntimeError(f"The variable called {s.name} has not been defined yet.", line_no=ln, col=col, line=raw)
             value = self._eval_expr(s.value, env=env, context="general")
-            env.set(s.name, value)
+            try:
+                env.set(s.name, value)
+            except KeyError as e:
+                raise VerbaRuntimeError(str(e), line_no=ln, col=col, line=raw)
             return
 
         if isinstance(s, ast.Increase):
@@ -286,7 +300,10 @@ class Interpreter:
                 raise VerbaRuntimeError(f"The variable called {s.name} has not been defined yet.", line_no=ln, col=col, line=raw)
             cur = env.get(s.name)
             by = self._to_number(self._eval_expr(s.by, env=env, context="general"), ln)
-            env.set(s.name, self._to_number(cur, ln) + by)
+            try:
+                env.set(s.name, self._to_number(cur, ln) + by)
+            except KeyError as e:
+                raise VerbaRuntimeError(str(e), line_no=ln, col=col, line=raw)
             return
 
         if isinstance(s, ast.Decrease):
@@ -294,7 +311,10 @@ class Interpreter:
                 raise VerbaRuntimeError(f"The variable called {s.name} has not been defined yet.", line_no=ln, col=col, line=raw)
             cur = env.get(s.name)
             by = self._to_number(self._eval_expr(s.by, env=env, context="general"), ln)
-            env.set(s.name, self._to_number(cur, ln) - by)
+            try:
+                env.set(s.name, self._to_number(cur, ln) - by)
+            except KeyError as e:
+                raise VerbaRuntimeError(str(e), line_no=ln, col=col, line=raw)
             return
 
         if isinstance(s, ast.Say):
@@ -532,12 +552,18 @@ class Interpreter:
             if not isinstance(result, list):
                 result = [result]
             for i, name in enumerate(s.names):
-                env.set(name, result[i] if i < len(result) else None)
+                try:
+                    env.set(name, result[i] if i < len(result) else None)
+                except KeyError as e:
+                    raise VerbaRuntimeError(str(e), line_no=ln, col=col, line=raw)
             return
 
         if isinstance(s, ast.LetResultOfRun):
             value = self._call(s.func_name, s.args, s.kwargs, caller_env=env, line_no=ln)
-            env.set(s.target_name, value)
+            try:
+                env.set(s.target_name, value)
+            except KeyError as e:
+                raise VerbaRuntimeError(str(e), line_no=ln, col=col, line=raw)
             return
 
         if isinstance(s, ast.SaveToFile):
@@ -605,7 +631,10 @@ class Interpreter:
                     mod_env = Environment(parent=self.globals)
                     self._exec_block(prog, env=mod_env)
                     # Bind as a Module object
-                    env.set(s.alias, Module(s.alias, mod_env))
+                    try:
+                        env.set(s.alias, Module(s.alias, mod_env))
+                    except KeyError as e:
+                        raise VerbaRuntimeError(str(e), line_no=ln, col=col, line=raw)
                 else:
                     # Legacy: execute in current env
                     self._exec_block(prog, env=env)
@@ -638,7 +667,10 @@ class Interpreter:
             try:
                 with urllib.request.urlopen(str(url)) as response:
                     html = response.read().decode()
-                env.set(s.target_name, html)
+                try:
+                    env.set(s.target_name, html)
+                except KeyError as e:
+                    raise VerbaRuntimeError(str(e), line_no=ln, col=col, line=raw)
             except Exception:
                 raise VerbaRuntimeError(f"I could not fetch the URL: {url}.", line_no=ln, col=col, line=raw)
             return
@@ -649,6 +681,8 @@ class Interpreter:
                 while curr is not None:
                     if s.name in curr.values:
                         del curr.values[s.name]
+                        if s.name in curr.constants:
+                            curr.constants.remove(s.name)
                         return
                     curr = curr.parent
             return

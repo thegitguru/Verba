@@ -99,6 +99,30 @@ maybe_name = some "Verba".
 missing_name = none.
 ```
 
+### 🔒 Constants & Immutability
+
+Verba supports constants using the `constant` keyword. These values are fixed after their first assignment and cannot be modified.
+
+```verba
+constant GREETING = "Hello, World!".
+say GREETING.
+
+GREETING = "Goodbye!". /- Error: Cannot re-assign to constant 'greeting'
+
+constant PI = 3.14.
+PI += 1. /- Error: Cannot re-assign to constant 'pi'
+```
+
+Constants are **lowercased** internally just like regular variables. To allow redefining a constant name, you must first explicitly `free` it:
+
+```verba
+constant X = 10.
+free X.
+constant X = 20. /- Success
+```
+
+---
+
 ### Null Safety & Option Types
 
 Verba now supports first-class option values for places where a value may or may not exist.

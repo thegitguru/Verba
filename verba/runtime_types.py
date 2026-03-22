@@ -116,6 +116,7 @@ class Environment:
     def __init__(self, parent: Optional["Environment"] = None):
         self.parent = parent
         self.values: dict[str, Any] = {}
+        self.constants: set[str] = set()
         self.functions: dict[str, "Function"] = {}
         self.classes: dict[str, "ClassObj"] = {}
 
@@ -128,11 +129,21 @@ class Environment:
         if self.parent: return self.parent.get(name)
         raise KeyError(name)
 
-    def set(self, name: str, value: Any, local: bool = False) -> None:
-        if local: self.values[name] = value; return
-        if name in self.values: self.values[name] = value; return
-        if self.parent and self.parent.contains(name): self.parent.set(name, value); return
+    def set(self, name: str, value: Any, local: bool = False, is_constant: bool = False) -> None:
+        if name in self.constants:
+            raise KeyError(f"Cannot re-assign to constant '{name}'")
+        if local:
+            self.values[name] = value
+            if is_constant: self.constants.add(name)
+            return
+        if name in self.values:
+            self.values[name] = value
+            return
+        if self.parent and self.parent.contains(name):
+            self.parent.set(name, value) # recursively checks constants
+            return
         self.values[name] = value
+        if is_constant: self.constants.add(name)
 
     def get_function(self, name: str) -> Optional["Function"]:
         if name in self.functions: return self.functions[name]

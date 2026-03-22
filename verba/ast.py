@@ -109,6 +109,13 @@ class Let(Stmt):
 
 
 @dataclass(frozen=True)
+class Constant(Stmt):
+    span: Span
+    name: str
+    value: Expr
+
+
+@dataclass(frozen=True)
 class SetVar(Stmt):
     span: Span
     name: str

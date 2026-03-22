@@ -10,6 +10,7 @@ from .ast import (
     Help,
     MatchBranch,
     BinaryOp,
+    Constant,
     BoolAnd,
     BoolExpr,
     BoolNot,
@@ -398,7 +399,7 @@ def _parse_interpolated(s: str, span: Span) -> object:
                 j = s.index('}', i + 1)
             except ValueError:
                 raise VerbaParseError("Found an unclosed '{' in a string. To write a literal brace, use '{{'.", line_no=span.line_no)
-            var = s[i+1:j].strip()
+            var = s[i+1:j].strip().lower()
             if '.' in var:
                 dot = var.index('.')
                 parts.append(ObjectPropGet(span, var[:dot], var[dot+1:]))
@@ -763,6 +764,19 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
             line_no=line_no, col=tokens[0].col, line=lt.raw
         )
 
+    # constant name = value.
+    if first_val == "constant":
+        if "=" in tokens_lc:
+            eq_i = tokens_lc.index("=")
+            name = _join_name(tokens[1:eq_i], line_no=line_no)
+            value = parse_expr(tokens[eq_i + 1 :], line_no=line_no)
+            cur.i += 1
+            return Constant(span, name, value)
+        raise VerbaParseError(
+            "I expected 'constant [name] = [value].'",
+            line_no=line_no, col=tokens[0].col, line=lt.raw
+        )
+
     # set is no longer supported — use x = value or deref ptr = value.
     if first_val == "set":
         raise VerbaParseError(
@@ -773,7 +787,7 @@ def _parse_statement(cur: _Cursor, *, expected_indent: int) -> Optional[Stmt]:
     # Prevent keywords from being evaluated as LHS of a concise assignment
     _STATEMENT_KEYWORDS = {
         "say", "print", "display", "ask", "if", "for", "while",
-        "repeat", "define", "async", "run", "let", "set", "increase",
+        "repeat", "define", "async", "run", "let", "set", "increase", "constant",
         "decrease", "save", "load", "import", "class", "free", "delete",
         "fetch", "append", "note", "try", "otherwise", "else", "end", "give", "return",
         "await", "deref", "serve", "on", "respond", "stop", "skip", "assert", "match", "raise"
@@ -1748,7 +1762,7 @@ def _parse_pattern(tokens: list[Token], line_no: int) -> MatchPattern:
     _KNOWN_KEYWORDS = [
         "say", "display", "ask", "if", "for", "while", "repeat", "define",
         "async", "run", "give", "return", "sort", "first", "last", "add",
-        "remove", "save", "load", "import", "class", "free", "delete",
+        "remove", "save", "load", "import", "class", "free", "delete", "constant",
         "fetch", "append", "note", "try", "match", "raise", "stop", "skip",
         "assert", "serve", "on", "respond", "redirect", "await", "deref", "with", "help", "enum"
     ]

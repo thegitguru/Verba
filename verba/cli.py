@@ -144,7 +144,7 @@ def format_file(path: Path) -> int:
         return 1
 
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="verba", description="Run Verba (natural English) programs.")
